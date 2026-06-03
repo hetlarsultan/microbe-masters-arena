@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
 import { BRANCHES, CASES, type Branch, type Case, type Test } from "@/lib/cases";
+import { EQUIPMENT, type Equipment } from "@/lib/equipment";
 
-type Stage = "menu" | "case" | "result";
+type Stage = "menu" | "case" | "result" | "learn";
 
 export function MicroLab() {
   const [stage, setStage] = useState<Stage>("menu");
   const [branch, setBranch] = useState<Branch | "all">("all");
+  const [learnBranch, setLearnBranch] = useState<Branch | "general">("general");
   const [caseIdx, setCaseIdx] = useState(0);
   const [runTests, setRunTests] = useState<Record<string, boolean>>({});
   const [picked, setPicked] = useState<string | null>(null);
@@ -25,6 +27,11 @@ export function MicroLab() {
     setRunTests({});
     setPicked(null);
     setStage("case");
+  }
+
+  function openLearn(b: Branch | "general") {
+    setLearnBranch(b);
+    setStage("learn");
   }
 
   function toggleTest(t: Test) {
@@ -60,11 +67,16 @@ export function MicroLab() {
     return (
       <Menu
         onStart={startBranch}
+        onLearn={openLearn}
         score={score}
         solvedCount={solved.length}
         total={CASES.length}
       />
     );
+  }
+
+  if (stage === "learn") {
+    return <LearnView branch={learnBranch} onBack={() => setStage("menu")} onChange={setLearnBranch} />;
   }
 
   if (!current) return null;
@@ -120,9 +132,10 @@ function FloatingMicrobes() {
 }
 
 function Menu({
-  onStart, score, solvedCount, total,
+  onStart, onLearn, score, solvedCount, total,
 }: {
   onStart: (b: Branch | "all") => void;
+  onLearn: (b: Branch | "general") => void;
   score: number;
   solvedCount: number;
   total: number;
@@ -172,6 +185,25 @@ function Menu({
                 desc={BRANCHES[b].desc}
                 hue={BRANCHES[b].hue}
                 onClick={() => onStart(b)}
+                onLearn={() => onLearn(b)}
+              />
+            ))}
+          </div>
+        </section>
+
+        <section className="mt-12">
+          <h2 className="mb-4 text-sm font-semibold tracking-widest text-muted-foreground">
+            🧰 مكتبة الأجهزة والمعدات — تعلّم تفاعلي
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <LearnTile icon="🧰" name="الأجهزة العامة للمختبر" hue={200} onClick={() => onLearn("general")} />
+            {(Object.keys(BRANCHES) as Branch[]).map((b) => (
+              <LearnTile
+                key={b}
+                icon={BRANCHES[b].icon}
+                name={`معدات ${BRANCHES[b].name}`}
+                hue={BRANCHES[b].hue}
+                onClick={() => onLearn(b)}
               />
             ))}
           </div>
@@ -185,6 +217,27 @@ function Menu({
   );
 }
 
+function LearnTile({ icon, name, hue, onClick }: { icon: string; name: string; hue: number; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="group flex items-center gap-3 rounded-xl border border-border bg-card/60 p-4 text-right transition-all hover:-translate-y-0.5 hover:border-primary/60"
+    >
+      <div
+        className="grid size-12 place-items-center rounded-lg text-2xl"
+        style={{ background: `oklch(0.30 0.08 ${hue} / 0.6)` }}
+      >
+        {icon}
+      </div>
+      <div className="flex-1">
+        <div className="font-semibold">{name}</div>
+        <div className="text-xs text-muted-foreground">تعلّم الأدوات وطريقة الاستخدام</div>
+      </div>
+      <span className="text-primary opacity-0 transition-opacity group-hover:opacity-100">📖</span>
+    </button>
+  );
+}
+
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="rounded-xl border border-border bg-card/60 p-3 backdrop-blur">
@@ -195,17 +248,14 @@ function Stat({ label, value }: { label: string; value: string | number }) {
 }
 
 function BranchCard({
-  icon, name, desc, hue, onClick, featured,
+  icon, name, desc, hue, onClick, onLearn, featured,
 }: {
-  icon: string; name: string; desc: string; hue: number; onClick: () => void; featured?: boolean;
+  icon: string; name: string; desc: string; hue: number; onClick: () => void; onLearn?: () => void; featured?: boolean;
 }) {
   return (
-    <button
-      onClick={onClick}
+    <div
       className="group relative overflow-hidden rounded-2xl border border-border bg-card p-6 text-right transition-all hover:-translate-y-1 hover:border-primary/60"
-      style={{
-        boxShadow: featured ? "var(--shadow-glow)" : undefined,
-      }}
+      style={{ boxShadow: featured ? "var(--shadow-glow)" : undefined }}
     >
       <div
         className="absolute -left-10 -top-10 size-32 rounded-full opacity-20 blur-2xl transition-opacity group-hover:opacity-40"
@@ -215,11 +265,24 @@ function BranchCard({
         <div className="text-5xl">{icon}</div>
         <h3 className="mt-4 text-xl font-bold">{name}</h3>
         <p className="mt-2 text-sm text-muted-foreground">{desc}</p>
-        <div className="mt-4 inline-flex items-center gap-2 text-sm text-primary opacity-0 transition-opacity group-hover:opacity-100">
-          ابدأ التشخيص ←
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            onClick={onClick}
+            className="rounded-lg bg-primary px-3 py-2 text-sm font-bold text-primary-foreground transition-transform hover:scale-105"
+          >
+            ابدأ التشخيص ←
+          </button>
+          {onLearn && (
+            <button
+              onClick={onLearn}
+              className="rounded-lg border border-border bg-secondary/60 px-3 py-2 text-sm font-semibold transition-colors hover:bg-secondary"
+            >
+              📖 تعلّم الأدوات
+            </button>
+          )}
         </div>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -425,6 +488,114 @@ function InfoRow({ label, value, accent }: { label: string; value: string; accen
       <div className={`mt-1 ${accent ? "text-lg font-bold text-primary" : "text-foreground/90"}`}>
         {value}
       </div>
+    </div>
+  );
+}
+
+/* ---------------- Learn ---------------- */
+
+function LearnView({
+  branch, onBack, onChange,
+}: {
+  branch: Branch | "general";
+  onBack: () => void;
+  onChange: (b: Branch | "general") => void;
+}) {
+  const list = EQUIPMENT[branch];
+  const title =
+    branch === "general" ? "🧰 الأجهزة العامة للمختبر" : `${BRANCHES[branch].icon} معدات ${BRANCHES[branch].name}`;
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  const tabs: Array<{ key: Branch | "general"; label: string; icon: string }> = [
+    { key: "general", label: "عام", icon: "🧰" },
+    ...(Object.keys(BRANCHES) as Branch[]).map((b) => ({
+      key: b,
+      label: BRANCHES[b].name,
+      icon: BRANCHES[b].icon,
+    })),
+  ];
+
+  return (
+    <div className="min-h-screen px-6 py-8">
+      <div className="mx-auto max-w-5xl">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <button onClick={onBack} className="text-sm text-muted-foreground hover:text-foreground">
+            ← القائمة
+          </button>
+          <div className="text-sm text-muted-foreground">وضع التعلّم</div>
+        </div>
+
+        <header className="rounded-3xl border border-border bg-card p-6">
+          <h1 className="text-3xl font-black">{title}</h1>
+          <p className="mt-2 text-muted-foreground">
+            تعرّف على الأدوات والأجهزة المستخدمة، وكيفية الاستخدام، ونصائح عملية للمختبر.
+          </p>
+        </header>
+
+        <div className="my-6 flex flex-wrap gap-2">
+          {tabs.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => { onChange(t.key); setOpenId(null); }}
+              className={`rounded-full border px-4 py-2 text-sm transition-colors ${
+                branch === t.key
+                  ? "border-primary bg-primary/15 text-primary"
+                  : "border-border bg-card/60 text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <span className="ml-2">{t.icon}</span>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          {list.map((eq) => (
+            <EquipmentCard
+              key={eq.name}
+              eq={eq}
+              open={openId === eq.name}
+              onToggle={() => setOpenId(openId === eq.name ? null : eq.name)}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EquipmentCard({ eq, open, onToggle }: { eq: Equipment; open: boolean; onToggle: () => void }) {
+  return (
+    <div className={`rounded-2xl border bg-card transition-all ${open ? "border-primary/60 glow" : "border-border"}`}>
+      <button onClick={onToggle} className="flex w-full items-center gap-4 p-5 text-right">
+        <div className="grid size-14 shrink-0 place-items-center rounded-xl bg-secondary/60 text-3xl">
+          {eq.icon}
+        </div>
+        <div className="flex-1">
+          <div className="font-bold">{eq.name}</div>
+          <div className="mt-1 line-clamp-1 text-xs text-muted-foreground">{eq.use}</div>
+        </div>
+        <span className={`text-primary transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
+      </button>
+      {open && (
+        <div className="space-y-3 border-t border-border p-5 pt-4">
+          <LearnRow icon="🎯" label="الاستخدام" text={eq.use} />
+          <LearnRow icon="⚙️" label="طريقة العمل" text={eq.howTo} />
+          <LearnRow icon="💡" label="نصيحة عملية" text={eq.tips} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LearnRow({ icon, label, text }: { icon: string; label: string; text: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-background/40 p-3">
+      <div className="flex items-center gap-2 text-xs font-semibold tracking-widest text-muted-foreground">
+        <span>{icon}</span>
+        {label}
+      </div>
+      <div className="mt-1 text-sm leading-relaxed text-foreground/90">{text}</div>
     </div>
   );
 }
