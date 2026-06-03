@@ -132,9 +132,10 @@ function FloatingMicrobes() {
 }
 
 function Menu({
-  onStart, score, solvedCount, total,
+  onStart, onLearn, score, solvedCount, total,
 }: {
   onStart: (b: Branch | "all") => void;
+  onLearn: (b: Branch | "general") => void;
   score: number;
   solvedCount: number;
   total: number;
