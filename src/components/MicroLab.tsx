@@ -67,11 +67,16 @@ export function MicroLab() {
     return (
       <Menu
         onStart={startBranch}
+        onLearn={openLearn}
         score={score}
         solvedCount={solved.length}
         total={CASES.length}
       />
     );
+  }
+
+  if (stage === "learn") {
+    return <LearnView branch={learnBranch} onBack={() => setStage("menu")} onChange={setLearnBranch} />;
   }
 
   if (!current) return null;
