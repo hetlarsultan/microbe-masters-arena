@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
 import { BRANCHES, CASES, type Branch, type Case, type Test } from "@/lib/cases";
+import { EQUIPMENT, type Equipment } from "@/lib/equipment";
 
-type Stage = "menu" | "case" | "result";
+type Stage = "menu" | "case" | "result" | "learn";
 
 export function MicroLab() {
   const [stage, setStage] = useState<Stage>("menu");
   const [branch, setBranch] = useState<Branch | "all">("all");
+  const [learnBranch, setLearnBranch] = useState<Branch | "general">("general");
   const [caseIdx, setCaseIdx] = useState(0);
   const [runTests, setRunTests] = useState<Record<string, boolean>>({});
   const [picked, setPicked] = useState<string | null>(null);
@@ -25,6 +27,11 @@ export function MicroLab() {
     setRunTests({});
     setPicked(null);
     setStage("case");
+  }
+
+  function openLearn(b: Branch | "general") {
+    setLearnBranch(b);
+    setStage("learn");
   }
 
   function toggleTest(t: Test) {
