@@ -185,6 +185,25 @@ function Menu({
                 desc={BRANCHES[b].desc}
                 hue={BRANCHES[b].hue}
                 onClick={() => onStart(b)}
+                onLearn={() => onLearn(b)}
+              />
+            ))}
+          </div>
+        </section>
+
+        <section className="mt-12">
+          <h2 className="mb-4 text-sm font-semibold tracking-widest text-muted-foreground">
+            🧰 مكتبة الأجهزة والمعدات — تعلّم تفاعلي
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <LearnTile icon="🧰" name="الأجهزة العامة للمختبر" hue={200} onClick={() => onLearn("general")} />
+            {(Object.keys(BRANCHES) as Branch[]).map((b) => (
+              <LearnTile
+                key={b}
+                icon={BRANCHES[b].icon}
+                name={`معدات ${BRANCHES[b].name}`}
+                hue={BRANCHES[b].hue}
+                onClick={() => onLearn(b)}
               />
             ))}
           </div>
@@ -195,6 +214,27 @@ function Menu({
         </footer>
       </div>
     </div>
+  );
+}
+
+function LearnTile({ icon, name, hue, onClick }: { icon: string; name: string; hue: number; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="group flex items-center gap-3 rounded-xl border border-border bg-card/60 p-4 text-right transition-all hover:-translate-y-0.5 hover:border-primary/60"
+    >
+      <div
+        className="grid size-12 place-items-center rounded-lg text-2xl"
+        style={{ background: `oklch(0.30 0.08 ${hue} / 0.6)` }}
+      >
+        {icon}
+      </div>
+      <div className="flex-1">
+        <div className="font-semibold">{name}</div>
+        <div className="text-xs text-muted-foreground">تعلّم الأدوات وطريقة الاستخدام</div>
+      </div>
+      <span className="text-primary opacity-0 transition-opacity group-hover:opacity-100">📖</span>
+    </button>
   );
 }
 
