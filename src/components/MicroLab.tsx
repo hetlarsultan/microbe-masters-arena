@@ -491,3 +491,111 @@ function InfoRow({ label, value, accent }: { label: string; value: string; accen
     </div>
   );
 }
+
+/* ---------------- Learn ---------------- */
+
+function LearnView({
+  branch, onBack, onChange,
+}: {
+  branch: Branch | "general";
+  onBack: () => void;
+  onChange: (b: Branch | "general") => void;
+}) {
+  const list = EQUIPMENT[branch];
+  const title =
+    branch === "general" ? "🧰 الأجهزة العامة للمختبر" : `${BRANCHES[branch].icon} معدات ${BRANCHES[branch].name}`;
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  const tabs: Array<{ key: Branch | "general"; label: string; icon: string }> = [
+    { key: "general", label: "عام", icon: "🧰" },
+    ...(Object.keys(BRANCHES) as Branch[]).map((b) => ({
+      key: b,
+      label: BRANCHES[b].name,
+      icon: BRANCHES[b].icon,
+    })),
+  ];
+
+  return (
+    <div className="min-h-screen px-6 py-8">
+      <div className="mx-auto max-w-5xl">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <button onClick={onBack} className="text-sm text-muted-foreground hover:text-foreground">
+            ← القائمة
+          </button>
+          <div className="text-sm text-muted-foreground">وضع التعلّم</div>
+        </div>
+
+        <header className="rounded-3xl border border-border bg-card p-6">
+          <h1 className="text-3xl font-black">{title}</h1>
+          <p className="mt-2 text-muted-foreground">
+            تعرّف على الأدوات والأجهزة المستخدمة، وكيفية الاستخدام، ونصائح عملية للمختبر.
+          </p>
+        </header>
+
+        <div className="my-6 flex flex-wrap gap-2">
+          {tabs.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => { onChange(t.key); setOpenId(null); }}
+              className={`rounded-full border px-4 py-2 text-sm transition-colors ${
+                branch === t.key
+                  ? "border-primary bg-primary/15 text-primary"
+                  : "border-border bg-card/60 text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <span className="ml-2">{t.icon}</span>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          {list.map((eq) => (
+            <EquipmentCard
+              key={eq.name}
+              eq={eq}
+              open={openId === eq.name}
+              onToggle={() => setOpenId(openId === eq.name ? null : eq.name)}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EquipmentCard({ eq, open, onToggle }: { eq: Equipment; open: boolean; onToggle: () => void }) {
+  return (
+    <div className={`rounded-2xl border bg-card transition-all ${open ? "border-primary/60 glow" : "border-border"}`}>
+      <button onClick={onToggle} className="flex w-full items-center gap-4 p-5 text-right">
+        <div className="grid size-14 shrink-0 place-items-center rounded-xl bg-secondary/60 text-3xl">
+          {eq.icon}
+        </div>
+        <div className="flex-1">
+          <div className="font-bold">{eq.name}</div>
+          <div className="mt-1 line-clamp-1 text-xs text-muted-foreground">{eq.use}</div>
+        </div>
+        <span className={`text-primary transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
+      </button>
+      {open && (
+        <div className="space-y-3 border-t border-border p-5 pt-4">
+          <LearnRow icon="🎯" label="الاستخدام" text={eq.use} />
+          <LearnRow icon="⚙️" label="طريقة العمل" text={eq.howTo} />
+          <LearnRow icon="💡" label="نصيحة عملية" text={eq.tips} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LearnRow({ icon, label, text }: { icon: string; label: string; text: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-background/40 p-3">
+      <div className="flex items-center gap-2 text-xs font-semibold tracking-widest text-muted-foreground">
+        <span>{icon}</span>
+        {label}
+      </div>
+      <div className="mt-1 text-sm leading-relaxed text-foreground/90">{text}</div>
+    </div>
+  );
+}
