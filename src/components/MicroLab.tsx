@@ -171,6 +171,30 @@ function Menu({
           </div>
         </header>
 
+        <section className="mt-10">
+          <button
+            onClick={onInstruments}
+            className="group relative w-full overflow-hidden rounded-3xl border border-toxic/40 bg-card p-6 text-right transition-all hover:-translate-y-1 hover:border-toxic"
+            style={{ boxShadow: "var(--shadow-toxic)" }}
+          >
+            <div className="absolute -left-10 -top-10 size-40 rounded-full bg-toxic/20 blur-3xl" />
+            <div className="absolute -right-10 -bottom-10 size-40 rounded-full bg-accent/20 blur-3xl" />
+            <div className="relative flex items-center gap-5">
+              <div className="grid size-20 place-items-center rounded-2xl bg-toxic/15 text-5xl glow">
+                🧪
+              </div>
+              <div className="flex-1">
+                <div className="text-xs font-bold tracking-widest text-toxic">جديد · SIMULATION</div>
+                <h3 className="mt-1 text-2xl font-black md:text-3xl">محاكاة الأجهزة المخبرية</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  شغّل PCR، ELISA، Gel Electrophoresis، Flow Cytometer، المجهر والحاضنة خطوة بخطوة كأنك أمامها.
+                </p>
+              </div>
+              <span className="hidden text-3xl text-toxic transition-transform group-hover:translate-x-2 md:block">←</span>
+            </div>
+          </button>
+        </section>
+
         <section className="mt-12">
           <h2 className="mb-4 text-sm font-semibold tracking-widest text-muted-foreground">
             اختر التخصص
