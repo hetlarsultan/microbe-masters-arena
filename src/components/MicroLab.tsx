@@ -69,11 +69,16 @@ export function MicroLab() {
       <Menu
         onStart={startBranch}
         onLearn={openLearn}
+        onInstruments={() => setStage("instruments")}
         score={score}
         solvedCount={solved.length}
         total={CASES.length}
       />
     );
+  }
+
+  if (stage === "instruments") {
+    return <InstrumentLab onBack={() => setStage("menu")} />;
   }
 
   if (stage === "learn") {
