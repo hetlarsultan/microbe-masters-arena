@@ -109,16 +109,45 @@ export function InstrumentLab({ onBack }: { onBack: () => void }) {
 
 /* ============================ RUNNER ============================ */
 
+function speak(text: string) {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  try {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "ar-SA";
+    u.rate = 0.95;
+    u.pitch = 1;
+    window.speechSynthesis.speak(u);
+  } catch {}
+}
+
 function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBack: () => void }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [completed, setCompleted] = useState<string[]>([]);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [done, setDone] = useState(false);
+  const [mode, setMode] = useState<"training" | "exam">("training");
+  const [voiceOn, setVoiceOn] = useState(true);
   const [logs, setLogs] = useState<string[]>([`[init] جهاز ${instrument.name} جاهز للتشغيل`]);
 
   const step = instrument.steps[currentStep];
   const pct = (completed.length / instrument.steps.length) * 100;
+
+  // Speak mentor intro on mount
+  useEffect(() => {
+    if (voiceOn && instrument.mentorIntro) speak(instrument.mentorIntro);
+    return () => { if (typeof window !== "undefined") window.speechSynthesis?.cancel(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instrument.id]);
+
+  // Speak step mentor text when step changes (training mode only)
+  useEffect(() => {
+    if (mode !== "training" || !voiceOn || !step) return;
+    const text = step.mentor || step.detail;
+    if (text) speak(`الخطوة ${currentStep + 1}: ${step.title}. ${text}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, instrument.id]);
 
   useEffect(() => {
     if (!running || !step) return;
@@ -172,8 +201,37 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
             <div className="flex-1">
               <h1 className="text-2xl font-black md:text-3xl">{instrument.name}</h1>
               <p className="mt-1 text-sm text-muted-foreground">{instrument.tagline}</p>
+              <div className="mt-2 flex flex-wrap gap-2 text-[10px]">
+                {instrument.level && <span className="rounded-full border border-border bg-background/40 px-2 py-1 tracking-widest text-muted-foreground">المستوى: {instrument.level}</span>}
+                {instrument.bsl && <span className="rounded-full border border-toxic/40 bg-toxic/10 px-2 py-1 tracking-widest text-toxic">{instrument.bsl}</span>}
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-1 rounded-full border border-border bg-background/40 p-1 text-xs">
+                <button onClick={() => setMode("training")} className={`rounded-full px-3 py-1 ${mode === "training" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>تدريب</button>
+                <button onClick={() => { setMode("exam"); window.speechSynthesis?.cancel(); }} className={`rounded-full px-3 py-1 ${mode === "exam" ? "bg-toxic text-background" : "text-muted-foreground"}`}>امتحان</button>
+              </div>
+              <button onClick={() => { setVoiceOn(v => !v); window.speechSynthesis?.cancel(); }} className="rounded-full border border-border bg-background/40 px-3 py-1 text-xs">
+                {voiceOn ? "🔊 صوت الدكتور" : "🔇 صامت"}
+              </button>
             </div>
           </div>
+
+          {/* Mentor speech bubble */}
+          {mode === "training" && step && (
+            <div className="mt-4 flex items-start gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-4">
+              <div className="grid size-12 shrink-0 place-items-center rounded-full bg-primary/20 text-2xl">👨‍⚕️</div>
+              <div className="flex-1">
+                <div className="text-xs font-bold tracking-widest text-primary">د. المشرف</div>
+                <p className="mt-1 text-sm leading-relaxed text-foreground/90">
+                  {step.mentor || `سنقوم الآن بـ: ${step.title}. ${step.detail}`}
+                </p>
+              </div>
+              <button onClick={() => speak(step.mentor || step.detail)} className="rounded-full border border-primary/40 bg-background/60 px-3 py-1 text-xs text-primary hover:bg-primary/10">
+                🔊 إعادة
+              </button>
+            </div>
+          )}
 
           {/* progress bar */}
           <div className="mt-5 h-2 overflow-hidden rounded-full bg-background/60">
@@ -183,6 +241,7 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
             />
           </div>
         </header>
+
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_1fr]">
           {/* LEFT: machine */}
