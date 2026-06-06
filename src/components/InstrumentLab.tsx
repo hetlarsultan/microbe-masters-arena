@@ -294,43 +294,45 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
                     </div>
                   </div>
                 ) : (
-                  <button
-                    onClick={() => {
-                      setRunning(true);
-                      setLogs((l) => [...l, `[run] ▶ ${step.action}…`]);
-                    }}
-                    className="mt-4 w-full rounded-xl bg-primary px-4 py-3 font-bold text-primary-foreground transition-transform hover:scale-[1.02]"
-                  >
-                    ▶ {step.action}
-                  </button>
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      onClick={() => {
+                        setRunning(true);
+                        setLogs((l) => [...l, `[run] ▶ ${step.action}…`]);
+                      }}
+                      className="flex-1 rounded-xl bg-primary px-4 py-3 font-bold text-primary-foreground transition-transform hover:scale-[1.02]"
+                    >
+                      ▶ {step.action}
+                    </button>
+                    <button
+                      onClick={() => logError(step.warn || "خطأ مخبري في الخطوة")}
+                      title="بلّغ عن خطأ مخبري"
+                      className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-3 text-destructive hover:bg-destructive/20"
+                    >
+                      ⚠ خطأ
+                    </button>
+                  </div>
                 )}
               </div>
             )}
 
             {done && (
-              <div className="rounded-2xl border border-primary/60 bg-primary/10 p-6 text-center glow">
-                <div className="mx-auto grid size-20 place-items-center rounded-full bg-primary/20 text-4xl text-primary">
-                  ✓
-                </div>
-                <h3 className="mt-3 text-2xl font-black text-primary">اكتملت المحاكاة</h3>
-                <p className="mt-2 text-foreground/90">{instrument.finalResult}</p>
-                <div className="mt-4 flex gap-3">
-                  <button
-                    onClick={reset}
-                    className="flex-1 rounded-xl border border-border bg-secondary px-4 py-3 font-semibold hover:bg-secondary/70"
-                  >
-                    ↻ إعادة
-                  </button>
-                  <button
-                    onClick={onBack}
-                    className="flex-1 rounded-xl bg-primary px-4 py-3 font-bold text-primary-foreground"
-                  >
-                    الأجهزة الأخرى
-                  </button>
-                </div>
-              </div>
+              <MedicalReport
+                instrument={instrument}
+                patientId={patientId}
+                startedAt={startedAt}
+                completedAt={new Date()}
+                completed={completed}
+                stepTimes={stepTimes}
+                errors={errors}
+                mode={mode}
+                onReset={reset}
+                onBack={onBack}
+              />
             )}
           </section>
+
+
 
           {/* RIGHT: steps + science */}
           <section className="space-y-4">
