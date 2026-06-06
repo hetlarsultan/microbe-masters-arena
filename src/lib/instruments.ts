@@ -221,9 +221,7 @@ export const INSTRUMENTS: Instrument[] = [
     finalResult: "✓ التعقيم مكتمل — الأدوات جاهزة للاستخدام في الكابينة المعقّمة.",
     resultVisual: "culture",
   },
-];
-
-export const INSTRUMENT_BRANCHES: Record<string, { name: string; icon: string }> = {
+  
   {
     id: "biosafety",
     name: "Biosafety Cabinet Class II — خزانة السلامة الحيوية",
