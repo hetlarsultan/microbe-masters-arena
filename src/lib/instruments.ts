@@ -7,14 +7,18 @@ export interface InstrumentStep {
   action: string; // button label
   duration?: number; // ms simulated processing
   warn?: string; // wrong action warning if user tries to skip
+  mentor?: string; // spoken mentor guidance
 }
 
 export interface Instrument {
   id: string;
   name: string;
   icon: string;
-  branch: Branch | "general" | "molecular";
+  branch: Branch | "general" | "molecular" | "genetic";
   tagline: string;
+  bsl?: "BSL-1" | "BSL-2" | "BSL-3";
+  level?: "مبتدئ" | "متوسط" | "متقدم" | "استشاري";
+  mentorIntro?: string;
   principle: string; // scientific principle
   safety: string[];
   steps: InstrumentStep[];
