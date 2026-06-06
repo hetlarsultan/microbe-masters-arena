@@ -109,16 +109,45 @@ export function InstrumentLab({ onBack }: { onBack: () => void }) {
 
 /* ============================ RUNNER ============================ */
 
+function speak(text: string) {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  try {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "ar-SA";
+    u.rate = 0.95;
+    u.pitch = 1;
+    window.speechSynthesis.speak(u);
+  } catch {}
+}
+
 function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBack: () => void }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [completed, setCompleted] = useState<string[]>([]);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [done, setDone] = useState(false);
+  const [mode, setMode] = useState<"training" | "exam">("training");
+  const [voiceOn, setVoiceOn] = useState(true);
   const [logs, setLogs] = useState<string[]>([`[init] جهاز ${instrument.name} جاهز للتشغيل`]);
 
   const step = instrument.steps[currentStep];
   const pct = (completed.length / instrument.steps.length) * 100;
+
+  // Speak mentor intro on mount
+  useEffect(() => {
+    if (voiceOn && instrument.mentorIntro) speak(instrument.mentorIntro);
+    return () => { if (typeof window !== "undefined") window.speechSynthesis?.cancel(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instrument.id]);
+
+  // Speak step mentor text when step changes (training mode only)
+  useEffect(() => {
+    if (mode !== "training" || !voiceOn || !step) return;
+    const text = step.mentor || step.detail;
+    if (text) speak(`الخطوة ${currentStep + 1}: ${step.title}. ${text}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, instrument.id]);
 
   useEffect(() => {
     if (!running || !step) return;
