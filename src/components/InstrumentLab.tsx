@@ -130,6 +130,10 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
   const [mode, setMode] = useState<"training" | "exam">("training");
   const [voiceOn, setVoiceOn] = useState(true);
   const [logs, setLogs] = useState<string[]>([`[init] جهاز ${instrument.name} جاهز للتشغيل`]);
+  const [errors, setErrors] = useState<{ stepId: string; stepTitle: string; note: string; time: string }[]>([]);
+  const [stepTimes, setStepTimes] = useState<Record<string, string>>({});
+  const [patientId] = useState(() => `PT-${Math.floor(Math.random() * 9000 + 1000)}`);
+  const [startedAt] = useState(() => new Date());
 
   const step = instrument.steps[currentStep];
   const pct = (completed.length / instrument.steps.length) * 100;
@@ -160,7 +164,9 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
         clearInterval(id);
         setRunning(false);
         setCompleted((c) => [...c, step.id]);
-        setLogs((l) => [...l, `[ok] ✓ ${step.title}`]);
+        const t = new Date().toLocaleTimeString("ar-EG");
+        setStepTimes((m) => ({ ...m, [step.id]: t }));
+        setLogs((l) => [...l, `[ok] ✓ ${step.title} — ${t}`]);
         if (currentStep + 1 >= instrument.steps.length) {
           setDone(true);
         } else {
@@ -172,14 +178,24 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
     return () => clearInterval(id);
   }, [running, step, currentStep, instrument.steps.length]);
 
+  function logError(note: string) {
+    if (!step) return;
+    const time = new Date().toLocaleTimeString("ar-EG");
+    setErrors((e) => [...e, { stepId: step.id, stepTitle: step.title, note, time }]);
+    setLogs((l) => [...l, `[err] ⚠ ${step.title}: ${note}`]);
+  }
+
   function reset() {
     setCurrentStep(0);
     setCompleted([]);
     setRunning(false);
     setProgress(0);
     setDone(false);
+    setErrors([]);
+    setStepTimes({});
     setLogs([`[reset] إعادة تشغيل ${instrument.name}`]);
   }
+
 
   return (
     <div className="min-h-screen px-6 py-8">
@@ -278,43 +294,45 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
                     </div>
                   </div>
                 ) : (
-                  <button
-                    onClick={() => {
-                      setRunning(true);
-                      setLogs((l) => [...l, `[run] ▶ ${step.action}…`]);
-                    }}
-                    className="mt-4 w-full rounded-xl bg-primary px-4 py-3 font-bold text-primary-foreground transition-transform hover:scale-[1.02]"
-                  >
-                    ▶ {step.action}
-                  </button>
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      onClick={() => {
+                        setRunning(true);
+                        setLogs((l) => [...l, `[run] ▶ ${step.action}…`]);
+                      }}
+                      className="flex-1 rounded-xl bg-primary px-4 py-3 font-bold text-primary-foreground transition-transform hover:scale-[1.02]"
+                    >
+                      ▶ {step.action}
+                    </button>
+                    <button
+                      onClick={() => logError(step.warn || "خطأ مخبري في الخطوة")}
+                      title="بلّغ عن خطأ مخبري"
+                      className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-3 text-destructive hover:bg-destructive/20"
+                    >
+                      ⚠ خطأ
+                    </button>
+                  </div>
                 )}
               </div>
             )}
 
             {done && (
-              <div className="rounded-2xl border border-primary/60 bg-primary/10 p-6 text-center glow">
-                <div className="mx-auto grid size-20 place-items-center rounded-full bg-primary/20 text-4xl text-primary">
-                  ✓
-                </div>
-                <h3 className="mt-3 text-2xl font-black text-primary">اكتملت المحاكاة</h3>
-                <p className="mt-2 text-foreground/90">{instrument.finalResult}</p>
-                <div className="mt-4 flex gap-3">
-                  <button
-                    onClick={reset}
-                    className="flex-1 rounded-xl border border-border bg-secondary px-4 py-3 font-semibold hover:bg-secondary/70"
-                  >
-                    ↻ إعادة
-                  </button>
-                  <button
-                    onClick={onBack}
-                    className="flex-1 rounded-xl bg-primary px-4 py-3 font-bold text-primary-foreground"
-                  >
-                    الأجهزة الأخرى
-                  </button>
-                </div>
-              </div>
+              <MedicalReport
+                instrument={instrument}
+                patientId={patientId}
+                startedAt={startedAt}
+                completedAt={new Date()}
+                completed={completed}
+                stepTimes={stepTimes}
+                errors={errors}
+                mode={mode}
+                onReset={reset}
+                onBack={onBack}
+              />
             )}
           </section>
+
+
 
           {/* RIGHT: steps + science */}
           <section className="space-y-4">
@@ -630,6 +648,205 @@ function ScopeViz({ running, done }: { running: boolean; done: boolean }) {
       <div className="absolute bottom-2 text-xs text-muted-foreground">
         {done ? "1000x — وضوح كامل" : "ضع الشريحة"}
       </div>
+    </div>
+  );
+}
+
+/* ============================ MEDICAL REPORT ============================ */
+
+function MedicalReport({
+  instrument,
+  patientId,
+  startedAt,
+  completedAt,
+  completed,
+  stepTimes,
+  errors,
+  mode,
+  onReset,
+  onBack,
+}: {
+  instrument: Instrument;
+  patientId: string;
+  startedAt: Date;
+  completedAt: Date;
+  completed: string[];
+  stepTimes: Record<string, string>;
+  errors: { stepId: string; stepTitle: string; note: string; time: string }[];
+  mode: "training" | "exam";
+  onReset: () => void;
+  onBack: () => void;
+}) {
+  const reportId = `RPT-${completedAt.getFullYear()}${String(completedAt.getMonth() + 1).padStart(2, "0")}${String(completedAt.getDate()).padStart(2, "0")}-${Math.floor(Math.random() * 9000 + 1000)}`;
+  const totalSteps = instrument.steps.length;
+  const doneCount = completed.length;
+  const errCount = errors.length;
+  const accuracy = Math.max(0, Math.round(((doneCount - errCount) / totalSteps) * 100));
+  const grade = errCount === 0 ? "ممتاز A+" : errCount === 1 ? "جيد جداً B" : errCount <= 3 ? "مقبول C" : "يحتاج إعادة D";
+  const durationMin = Math.max(1, Math.round((completedAt.getTime() - startedAt.getTime()) / 60000));
+
+  function downloadReport() {
+    const lines = [
+      `تقرير مخبري طبي — MICROBIOLOGY LAB REPORT`,
+      `==========================================`,
+      `رقم التقرير: ${reportId}`,
+      `رقم المريض: ${patientId}`,
+      `الجهاز: ${instrument.name}`,
+      `القسم: ${instrument.branch}`,
+      `الوضع: ${mode === "training" ? "تدريب" : "امتحان"}`,
+      `تاريخ البدء: ${startedAt.toLocaleString("ar-EG")}`,
+      `تاريخ الانتهاء: ${completedAt.toLocaleString("ar-EG")}`,
+      `المدة الكلية: ${durationMin} دقيقة`,
+      ``,
+      `— الخطوات المنفذة —`,
+      ...instrument.steps.map((s, i) => `${i + 1}. ${s.title}  [${stepTimes[s.id] ?? "—"}]`),
+      ``,
+      `— الأخطاء المسجلة (${errCount}) —`,
+      ...(errCount === 0 ? ["لا توجد أخطاء — أداء مثالي."] : errors.map((e, i) => `${i + 1}. [${e.time}] ${e.stepTitle} → ${e.note}`)),
+      ``,
+      `— التشخيص النهائي —`,
+      instrument.finalResult,
+      ``,
+      `— التقييم —`,
+      `الدقة: ${accuracy}%`,
+      `التقدير: ${grade}`,
+      ``,
+      `توقيع المشرف: د. _______________________`,
+    ];
+    const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${reportId}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div className="rounded-2xl border-2 border-primary/40 bg-card p-6 shadow-2xl glow">
+      {/* Letterhead */}
+      <div className="flex items-start justify-between border-b border-border pb-4">
+        <div>
+          <div className="text-xs font-bold tracking-widest text-primary">MEDICAL LABORATORY REPORT</div>
+          <h2 className="mt-1 text-xl font-black">تقرير مخبري طبي</h2>
+          <div className="mt-1 text-xs text-muted-foreground">MicroLab Clinical Diagnostics</div>
+        </div>
+        <div className="text-left text-xs text-muted-foreground">
+          <div>رقم التقرير: <span className="font-bold text-foreground">{reportId}</span></div>
+          <div>رقم المريض: <span className="font-bold text-foreground">{patientId}</span></div>
+          <div>التاريخ: {completedAt.toLocaleDateString("ar-EG")}</div>
+        </div>
+      </div>
+
+      {/* Meta */}
+      <div className="mt-4 grid grid-cols-2 gap-3 text-xs md:grid-cols-4">
+        <Field label="الجهاز" value={instrument.name} />
+        <Field label="القسم" value={instrument.branch} />
+        <Field label="الوضع" value={mode === "training" ? "تدريب" : "امتحان"} />
+        <Field label="المدة" value={`${durationMin} د`} />
+      </div>
+
+      {/* Diagnosis */}
+      <div className="mt-5 rounded-xl border-2 border-primary/60 bg-primary/10 p-4">
+        <div className="text-xs font-bold tracking-widest text-primary">🩺 التشخيص النهائي</div>
+        <p className="mt-2 text-sm font-bold leading-relaxed text-foreground">{instrument.finalResult}</p>
+      </div>
+
+      {/* Steps */}
+      <div className="mt-5">
+        <div className="mb-2 text-xs font-bold tracking-widest text-muted-foreground">📋 الخطوات المنفذة ({doneCount}/{totalSteps})</div>
+        <ol className="space-y-1.5 text-sm">
+          {instrument.steps.map((s, i) => {
+            const isDone = completed.includes(s.id);
+            return (
+              <li key={s.id} className="flex items-center justify-between rounded-lg border border-border bg-background/40 px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <span className={`grid size-6 place-items-center rounded-full text-[10px] font-bold ${isDone ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
+                    {isDone ? "✓" : i + 1}
+                  </span>
+                  <span className="font-medium">{s.title}</span>
+                </div>
+                <span className="font-mono text-[10px] text-muted-foreground">{stepTimes[s.id] ?? "—"}</span>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+
+      {/* Errors */}
+      <div className="mt-5">
+        <div className="mb-2 text-xs font-bold tracking-widest text-muted-foreground">⚠ الأخطاء المسجلة ({errCount})</div>
+        {errCount === 0 ? (
+          <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-3 text-sm text-primary">
+            ✓ لا توجد أخطاء — أداء مثالي.
+          </div>
+        ) : (
+          <ul className="space-y-1.5 text-sm">
+            {errors.map((e, i) => (
+              <li key={i} className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-destructive">
+                <div className="flex justify-between text-[11px] opacity-80">
+                  <span>الخطوة: {e.stepTitle}</span>
+                  <span className="font-mono">{e.time}</span>
+                </div>
+                <div className="mt-1 text-foreground/90">⚠ {e.note}</div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Scorecard */}
+      <div className="mt-5 grid grid-cols-3 gap-3">
+        <Stat label="الدقة" value={`${accuracy}%`} tone="primary" />
+        <Stat label="الخطوات" value={`${doneCount}/${totalSteps}`} tone="muted" />
+        <Stat label="التقدير" value={grade} tone={errCount === 0 ? "primary" : errCount <= 3 ? "muted" : "danger"} />
+      </div>
+
+      {/* Signature */}
+      <div className="mt-6 flex items-end justify-between border-t border-border pt-4 text-xs">
+        <div>
+          <div className="text-muted-foreground">توقيع المشرف</div>
+          <div className="mt-2 italic text-foreground/70">د. ـــــــــــــــــــــــــ</div>
+        </div>
+        <div className="text-left text-muted-foreground">
+          ختم المختبر 🧪
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="mt-5 grid gap-2 md:grid-cols-4">
+        <button onClick={() => window.print()} className="rounded-xl border border-border bg-secondary px-3 py-2 text-sm font-semibold hover:bg-secondary/70">
+          🖨 طباعة
+        </button>
+        <button onClick={downloadReport} className="rounded-xl border border-border bg-secondary px-3 py-2 text-sm font-semibold hover:bg-secondary/70">
+          ⬇ تحميل
+        </button>
+        <button onClick={onReset} className="rounded-xl border border-border bg-secondary px-3 py-2 text-sm font-semibold hover:bg-secondary/70">
+          ↻ إعادة الحالة
+        </button>
+        <button onClick={onBack} className="rounded-xl bg-primary px-3 py-2 text-sm font-bold text-primary-foreground">
+          أجهزة أخرى
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-background/40 px-3 py-2">
+      <div className="text-[10px] tracking-widest text-muted-foreground">{label}</div>
+      <div className="mt-0.5 truncate text-sm font-bold text-foreground">{value}</div>
+    </div>
+  );
+}
+
+function Stat({ label, value, tone }: { label: string; value: string; tone: "primary" | "muted" | "danger" }) {
+  const cls = tone === "primary" ? "border-primary/40 bg-primary/10 text-primary" : tone === "danger" ? "border-destructive/40 bg-destructive/10 text-destructive" : "border-border bg-background/40 text-foreground";
+  return (
+    <div className={`rounded-xl border p-3 text-center ${cls}`}>
+      <div className="text-[10px] tracking-widest opacity-80">{label}</div>
+      <div className="mt-1 text-lg font-black">{value}</div>
     </div>
   );
 }
