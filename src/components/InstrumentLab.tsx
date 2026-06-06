@@ -130,6 +130,10 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
   const [mode, setMode] = useState<"training" | "exam">("training");
   const [voiceOn, setVoiceOn] = useState(true);
   const [logs, setLogs] = useState<string[]>([`[init] جهاز ${instrument.name} جاهز للتشغيل`]);
+  const [errors, setErrors] = useState<{ stepId: string; stepTitle: string; note: string; time: string }[]>([]);
+  const [stepTimes, setStepTimes] = useState<Record<string, string>>({});
+  const [patientId] = useState(() => `PT-${Math.floor(Math.random() * 9000 + 1000)}`);
+  const [startedAt] = useState(() => new Date());
 
   const step = instrument.steps[currentStep];
   const pct = (completed.length / instrument.steps.length) * 100;
@@ -160,7 +164,9 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
         clearInterval(id);
         setRunning(false);
         setCompleted((c) => [...c, step.id]);
-        setLogs((l) => [...l, `[ok] ✓ ${step.title}`]);
+        const t = new Date().toLocaleTimeString("ar-EG");
+        setStepTimes((m) => ({ ...m, [step.id]: t }));
+        setLogs((l) => [...l, `[ok] ✓ ${step.title} — ${t}`]);
         if (currentStep + 1 >= instrument.steps.length) {
           setDone(true);
         } else {
@@ -172,14 +178,24 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
     return () => clearInterval(id);
   }, [running, step, currentStep, instrument.steps.length]);
 
+  function logError(note: string) {
+    if (!step) return;
+    const time = new Date().toLocaleTimeString("ar-EG");
+    setErrors((e) => [...e, { stepId: step.id, stepTitle: step.title, note, time }]);
+    setLogs((l) => [...l, `[err] ⚠ ${step.title}: ${note}`]);
+  }
+
   function reset() {
     setCurrentStep(0);
     setCompleted([]);
     setRunning(false);
     setProgress(0);
     setDone(false);
+    setErrors([]);
+    setStepTimes({});
     setLogs([`[reset] إعادة تشغيل ${instrument.name}`]);
   }
+
 
   return (
     <div className="min-h-screen px-6 py-8">
