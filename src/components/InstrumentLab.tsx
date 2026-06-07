@@ -705,6 +705,8 @@ function MedicalReport({
   completedAt,
   completed,
   stepTimes,
+  stepDurations,
+  stepResults,
   errors,
   mode,
   onReset,
@@ -716,6 +718,8 @@ function MedicalReport({
   completedAt: Date;
   completed: string[];
   stepTimes: Record<string, string>;
+  stepDurations: Record<string, number>;
+  stepResults: Record<string, "ok" | "err">;
   errors: { stepId: string; stepTitle: string; note: string; time: string }[];
   mode: "training" | "exam";
   onReset: () => void;
