@@ -902,3 +902,114 @@ function Stat({ label, value, tone }: { label: string; value: string; tone: "pri
     </div>
   );
 }
+
+/* ============================ LIVE CASE REPORT ============================ */
+
+function LiveCaseReport({
+  instrument,
+  patientId,
+  startedAt,
+  completed,
+  stepTimes,
+  stepDurations,
+  stepResults,
+  errors,
+  done,
+}: {
+  instrument: Instrument;
+  patientId: string;
+  startedAt: Date;
+  completed: string[];
+  stepTimes: Record<string, string>;
+  stepDurations: Record<string, number>;
+  stepResults: Record<string, "ok" | "err">;
+  errors: { stepId: string; stepTitle: string; note: string; time: string }[];
+  done: boolean;
+}) {
+  const total = instrument.steps.length;
+  const doneCount = completed.length;
+  const errCount = errors.length;
+  const okCount = doneCount - errCount;
+  const totalSec = Object.values(stepDurations).reduce((a, b) => a + b, 0) / 1000;
+
+  return (
+    <div className="rounded-2xl border border-primary/30 bg-card p-5">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="text-xs font-bold tracking-widest text-primary">📑 تقرير الحالة المباشر</div>
+        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+          <span className="rounded-full bg-background/60 px-2 py-1 font-mono">{patientId}</span>
+          <span className="rounded-full bg-background/60 px-2 py-1">{startedAt.toLocaleTimeString("ar-EG")}</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-4 gap-2 text-center text-[10px]">
+        <div className="rounded-lg border border-border bg-background/40 p-2">
+          <div className="text-muted-foreground">الخطوات</div>
+          <div className="text-sm font-bold text-foreground">{doneCount}/{total}</div>
+        </div>
+        <div className="rounded-lg border border-primary/30 bg-primary/10 p-2">
+          <div className="text-muted-foreground">صح</div>
+          <div className="text-sm font-bold text-primary">{okCount}</div>
+        </div>
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-2">
+          <div className="text-muted-foreground">خطأ</div>
+          <div className="text-sm font-bold text-destructive">{errCount}</div>
+        </div>
+        <div className="rounded-lg border border-border bg-background/40 p-2">
+          <div className="text-muted-foreground">المدة</div>
+          <div className="text-sm font-bold text-foreground">{totalSec.toFixed(1)}ث</div>
+        </div>
+      </div>
+
+      <ol className="mt-3 max-h-56 space-y-1 overflow-auto pr-1 text-xs">
+        {instrument.steps.map((s, i) => {
+          const isDone = completed.includes(s.id);
+          const res = stepResults[s.id];
+          const dur = stepDurations[s.id];
+          if (!isDone) return null;
+          const ok = res !== "err";
+          return (
+            <li
+              key={s.id}
+              className={`flex items-center justify-between rounded-md border px-2 py-1.5 ${
+                ok ? "border-primary/30 bg-primary/5" : "border-destructive/40 bg-destructive/5"
+              }`}
+            >
+              <span className="flex items-center gap-2 truncate">
+                <span className={`grid size-5 place-items-center rounded-full text-[9px] font-bold ${ok ? "bg-primary text-primary-foreground" : "bg-destructive text-destructive-foreground"}`}>
+                  {ok ? "✓" : "✕"}
+                </span>
+                <span className="truncate font-medium">#{i + 1} {s.title}</span>
+              </span>
+              <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                {dur != null ? `${(dur / 1000).toFixed(1)}ث · ` : ""}{stepTimes[s.id]}
+              </span>
+            </li>
+          );
+        })}
+        {doneCount === 0 && (
+          <li className="rounded-md border border-dashed border-border bg-background/40 px-2 py-3 text-center text-[10px] text-muted-foreground">
+            لم تُنفَّذ أي خطوة بعد — ابدأ بالضغط على زر الخطوة الحالية.
+          </li>
+        )}
+      </ol>
+
+      {errCount > 0 && (
+        <div className="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-2 text-[11px] text-destructive">
+          <div className="font-bold">⚠ أخطاء مسجلة:</div>
+          <ul className="mt-1 space-y-0.5">
+            {errors.map((e, i) => (
+              <li key={i} className="opacity-90">• [{e.time}] {e.stepTitle} — {e.note}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {done && (
+        <div className="mt-3 rounded-lg border-2 border-primary/50 bg-primary/10 p-2 text-center text-xs font-bold text-primary">
+          🩺 {instrument.finalResult}
+        </div>
+      )}
+    </div>
+  );
+}
