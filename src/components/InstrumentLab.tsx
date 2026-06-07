@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { INSTRUMENTS, INSTRUMENT_BRANCHES, type Instrument } from "@/lib/instruments";
+import { Lab3D } from "@/components/Lab3D";
+
 
 type View = "list" | "run";
 
