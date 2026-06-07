@@ -134,6 +134,9 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
   const [logs, setLogs] = useState<string[]>([`[init] جهاز ${instrument.name} جاهز للتشغيل`]);
   const [errors, setErrors] = useState<{ stepId: string; stepTitle: string; note: string; time: string }[]>([]);
   const [stepTimes, setStepTimes] = useState<Record<string, string>>({});
+  const [stepDurations, setStepDurations] = useState<Record<string, number>>({});
+  const [stepResults, setStepResults] = useState<Record<string, "ok" | "err">>({});
+  const [stepStart, setStepStart] = useState<number>(() => Date.now());
   const [patientId] = useState(() => `PT-${Math.floor(Math.random() * 9000 + 1000)}`);
   const [startedAt] = useState(() => new Date());
 
@@ -147,8 +150,9 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instrument.id]);
 
-  // Speak step mentor text when step changes (training mode only)
+  // Speak step mentor text when step changes (training mode only) + reset step timer
   useEffect(() => {
+    setStepStart(Date.now());
     if (mode !== "training" || !voiceOn || !step) return;
     const text = step.mentor || step.detail;
     if (text) speak(`الخطوة ${currentStep + 1}: ${step.title}. ${text}`);
@@ -166,9 +170,13 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
         clearInterval(id);
         setRunning(false);
         setCompleted((c) => [...c, step.id]);
-        const t = new Date().toLocaleTimeString("ar-EG");
+        const now = new Date();
+        const t = now.toLocaleTimeString("ar-EG");
+        const elapsedMs = now.getTime() - stepStart;
         setStepTimes((m) => ({ ...m, [step.id]: t }));
-        setLogs((l) => [...l, `[ok] ✓ ${step.title} — ${t}`]);
+        setStepDurations((m) => ({ ...m, [step.id]: elapsedMs }));
+        setStepResults((m) => (m[step.id] === "err" ? m : { ...m, [step.id]: "ok" }));
+        setLogs((l) => [...l, `[ok] ✓ ${step.title} — ${t} (${(elapsedMs / 1000).toFixed(1)}ث)`]);
         if (currentStep + 1 >= instrument.steps.length) {
           setDone(true);
         } else {
@@ -178,12 +186,13 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
       }
     }, 60);
     return () => clearInterval(id);
-  }, [running, step, currentStep, instrument.steps.length]);
+  }, [running, step, currentStep, instrument.steps.length, stepStart]);
 
   function logError(note: string) {
     if (!step) return;
     const time = new Date().toLocaleTimeString("ar-EG");
     setErrors((e) => [...e, { stepId: step.id, stepTitle: step.title, note, time }]);
+    setStepResults((m) => ({ ...m, [step.id]: "err" }));
     setLogs((l) => [...l, `[err] ⚠ ${step.title}: ${note}`]);
   }
 
@@ -195,6 +204,9 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
     setDone(false);
     setErrors([]);
     setStepTimes({});
+    setStepDurations({});
+    setStepResults({});
+    setStepStart(Date.now());
     setLogs([`[reset] إعادة تشغيل ${instrument.name}`]);
   }
 
@@ -330,6 +342,8 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
                 completedAt={new Date()}
                 completed={completed}
                 stepTimes={stepTimes}
+                stepDurations={stepDurations}
+                stepResults={stepResults}
                 errors={errors}
                 mode={mode}
                 onReset={reset}
@@ -371,12 +385,16 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
                 {instrument.steps.map((s, i) => {
                   const isDone = completed.includes(s.id);
                   const isCurrent = i === currentStep && !done;
+                  const res = stepResults[s.id];
+                  const dur = stepDurations[s.id];
                   return (
                     <li
                       key={s.id}
                       className={`flex items-center gap-3 rounded-xl border p-3 text-sm transition-all ${
                         isDone
-                          ? "border-primary/40 bg-primary/5 text-primary"
+                          ? res === "err"
+                            ? "border-destructive/50 bg-destructive/5 text-destructive"
+                            : "border-primary/40 bg-primary/5 text-primary"
                           : isCurrent
                           ? "border-toxic bg-toxic/5"
                           : "border-border bg-background/40 text-muted-foreground"
@@ -385,20 +403,40 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
                       <span
                         className={`grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold ${
                           isDone
-                            ? "bg-primary text-primary-foreground"
+                            ? res === "err"
+                              ? "bg-destructive text-destructive-foreground"
+                              : "bg-primary text-primary-foreground"
                             : isCurrent
                             ? "bg-toxic text-background animate-pulse"
                             : "bg-secondary"
                         }`}
                       >
-                        {isDone ? "✓" : i + 1}
+                        {isDone ? (res === "err" ? "✕" : "✓") : i + 1}
                       </span>
                       <span className="flex-1 font-medium">{s.title}</span>
+                      {isDone && (
+                        <span className="font-mono text-[10px] opacity-80">
+                          {dur != null ? `${(dur / 1000).toFixed(1)}ث` : ""} · {stepTimes[s.id]}
+                        </span>
+                      )}
                     </li>
                   );
                 })}
               </ol>
             </div>
+
+            {/* LIVE CASE REPORT — updates instantly after each step */}
+            <LiveCaseReport
+              instrument={instrument}
+              patientId={patientId}
+              startedAt={startedAt}
+              completed={completed}
+              stepTimes={stepTimes}
+              stepDurations={stepDurations}
+              stepResults={stepResults}
+              errors={errors}
+              done={done}
+            />
 
             {/* Console log */}
             <div className="rounded-2xl border border-border bg-background/60 p-4">
@@ -667,6 +705,8 @@ function MedicalReport({
   completedAt,
   completed,
   stepTimes,
+  stepDurations,
+  stepResults,
   errors,
   mode,
   onReset,
@@ -678,6 +718,8 @@ function MedicalReport({
   completedAt: Date;
   completed: string[];
   stepTimes: Record<string, string>;
+  stepDurations: Record<string, number>;
+  stepResults: Record<string, "ok" | "err">;
   errors: { stepId: string; stepTitle: string; note: string; time: string }[];
   mode: "training" | "exam";
   onReset: () => void;
@@ -764,15 +806,19 @@ function MedicalReport({
         <ol className="space-y-1.5 text-sm">
           {instrument.steps.map((s, i) => {
             const isDone = completed.includes(s.id);
+            const res = stepResults[s.id];
+            const dur = stepDurations[s.id];
             return (
               <li key={s.id} className="flex items-center justify-between rounded-lg border border-border bg-background/40 px-3 py-2">
                 <div className="flex items-center gap-2">
-                  <span className={`grid size-6 place-items-center rounded-full text-[10px] font-bold ${isDone ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
-                    {isDone ? "✓" : i + 1}
+                  <span className={`grid size-6 place-items-center rounded-full text-[10px] font-bold ${isDone ? (res === "err" ? "bg-destructive text-destructive-foreground" : "bg-primary text-primary-foreground") : "bg-secondary text-muted-foreground"}`}>
+                    {isDone ? (res === "err" ? "✕" : "✓") : i + 1}
                   </span>
                   <span className="font-medium">{s.title}</span>
                 </div>
-                <span className="font-mono text-[10px] text-muted-foreground">{stepTimes[s.id] ?? "—"}</span>
+                <span className="font-mono text-[10px] text-muted-foreground">
+                  {dur != null ? `${(dur / 1000).toFixed(1)}ث · ` : ""}{stepTimes[s.id] ?? "—"}
+                </span>
               </li>
             );
           })}
@@ -853,6 +899,117 @@ function Stat({ label, value, tone }: { label: string; value: string; tone: "pri
     <div className={`rounded-xl border p-3 text-center ${cls}`}>
       <div className="text-[10px] tracking-widest opacity-80">{label}</div>
       <div className="mt-1 text-lg font-black">{value}</div>
+    </div>
+  );
+}
+
+/* ============================ LIVE CASE REPORT ============================ */
+
+function LiveCaseReport({
+  instrument,
+  patientId,
+  startedAt,
+  completed,
+  stepTimes,
+  stepDurations,
+  stepResults,
+  errors,
+  done,
+}: {
+  instrument: Instrument;
+  patientId: string;
+  startedAt: Date;
+  completed: string[];
+  stepTimes: Record<string, string>;
+  stepDurations: Record<string, number>;
+  stepResults: Record<string, "ok" | "err">;
+  errors: { stepId: string; stepTitle: string; note: string; time: string }[];
+  done: boolean;
+}) {
+  const total = instrument.steps.length;
+  const doneCount = completed.length;
+  const errCount = errors.length;
+  const okCount = doneCount - errCount;
+  const totalSec = Object.values(stepDurations).reduce((a, b) => a + b, 0) / 1000;
+
+  return (
+    <div className="rounded-2xl border border-primary/30 bg-card p-5">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="text-xs font-bold tracking-widest text-primary">📑 تقرير الحالة المباشر</div>
+        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+          <span className="rounded-full bg-background/60 px-2 py-1 font-mono">{patientId}</span>
+          <span className="rounded-full bg-background/60 px-2 py-1">{startedAt.toLocaleTimeString("ar-EG")}</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-4 gap-2 text-center text-[10px]">
+        <div className="rounded-lg border border-border bg-background/40 p-2">
+          <div className="text-muted-foreground">الخطوات</div>
+          <div className="text-sm font-bold text-foreground">{doneCount}/{total}</div>
+        </div>
+        <div className="rounded-lg border border-primary/30 bg-primary/10 p-2">
+          <div className="text-muted-foreground">صح</div>
+          <div className="text-sm font-bold text-primary">{okCount}</div>
+        </div>
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-2">
+          <div className="text-muted-foreground">خطأ</div>
+          <div className="text-sm font-bold text-destructive">{errCount}</div>
+        </div>
+        <div className="rounded-lg border border-border bg-background/40 p-2">
+          <div className="text-muted-foreground">المدة</div>
+          <div className="text-sm font-bold text-foreground">{totalSec.toFixed(1)}ث</div>
+        </div>
+      </div>
+
+      <ol className="mt-3 max-h-56 space-y-1 overflow-auto pr-1 text-xs">
+        {instrument.steps.map((s, i) => {
+          const isDone = completed.includes(s.id);
+          const res = stepResults[s.id];
+          const dur = stepDurations[s.id];
+          if (!isDone) return null;
+          const ok = res !== "err";
+          return (
+            <li
+              key={s.id}
+              className={`flex items-center justify-between rounded-md border px-2 py-1.5 ${
+                ok ? "border-primary/30 bg-primary/5" : "border-destructive/40 bg-destructive/5"
+              }`}
+            >
+              <span className="flex items-center gap-2 truncate">
+                <span className={`grid size-5 place-items-center rounded-full text-[9px] font-bold ${ok ? "bg-primary text-primary-foreground" : "bg-destructive text-destructive-foreground"}`}>
+                  {ok ? "✓" : "✕"}
+                </span>
+                <span className="truncate font-medium">#{i + 1} {s.title}</span>
+              </span>
+              <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                {dur != null ? `${(dur / 1000).toFixed(1)}ث · ` : ""}{stepTimes[s.id]}
+              </span>
+            </li>
+          );
+        })}
+        {doneCount === 0 && (
+          <li className="rounded-md border border-dashed border-border bg-background/40 px-2 py-3 text-center text-[10px] text-muted-foreground">
+            لم تُنفَّذ أي خطوة بعد — ابدأ بالضغط على زر الخطوة الحالية.
+          </li>
+        )}
+      </ol>
+
+      {errCount > 0 && (
+        <div className="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-2 text-[11px] text-destructive">
+          <div className="font-bold">⚠ أخطاء مسجلة:</div>
+          <ul className="mt-1 space-y-0.5">
+            {errors.map((e, i) => (
+              <li key={i} className="opacity-90">• [{e.time}] {e.stepTitle} — {e.note}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {done && (
+        <div className="mt-3 rounded-lg border-2 border-primary/50 bg-primary/10 p-2 text-center text-xs font-bold text-primary">
+          🩺 {instrument.finalResult}
+        </div>
+      )}
     </div>
   );
 }

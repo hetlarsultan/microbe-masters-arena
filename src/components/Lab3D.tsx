@@ -193,23 +193,30 @@ function LED({ on, color = "oklch(0.78 0.18 165)" }: { on?: boolean; color?: str
   );
 }
 
-function Hotspot({ active, label, style }: { active: boolean; label: string; style?: React.CSSProperties }) {
+function Hotspot({ active, done, label, style }: { active: boolean; done?: boolean; label: string; style?: React.CSSProperties }) {
+  const state = active ? "active" : done ? "done" : "idle";
+  const ring =
+    state === "active"
+      ? "border-toxic bg-toxic/40 animate-ping"
+      : state === "done"
+      ? "border-primary bg-primary/50"
+      : "border-border/40 bg-background/40";
+  const labelCls =
+    state === "active"
+      ? "border-toxic/60 bg-background/95 text-toxic"
+      : state === "done"
+      ? "border-primary/50 bg-background/90 text-primary"
+      : "border-border/40 bg-background/70 text-muted-foreground";
   return (
-    <div
-      className="absolute z-10 -translate-x-1/2 -translate-y-1/2"
-      style={style}
-    >
-      <span
-        className={`block size-5 rounded-full border-2 ${active ? "border-toxic bg-toxic/40 animate-ping" : "border-border/40 bg-background/40"}`}
-      />
-      {active && (
-        <span className="absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap rounded-md border border-toxic/50 bg-background/90 px-2 py-0.5 text-[10px] font-bold text-toxic">
-          {label}
-        </span>
-      )}
+    <div className="absolute z-10 -translate-x-1/2 -translate-y-1/2" style={style}>
+      <span className={`block size-5 rounded-full border-2 ${ring}`} />
+      <span className={`absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[9px] font-bold ${labelCls}`}>
+        {state === "done" ? "✓ " : state === "active" ? "● " : ""}{label}
+      </span>
     </div>
   );
 }
+
 
 /* ===================== PCR ===================== */
 
@@ -286,11 +293,11 @@ function PCR3D({ running, progress, done, stepIndex }: { running: boolean; progr
         </div>
       </div>
       {/* Hotspots over device */}
-      <Hotspot active={stepIndex === 0} label="إدخال العينة" style={{ left: "20%", top: "62%" }} />
-      <Hotspot active={stepIndex === 1} label="Master Mix" style={{ left: "22%", top: "78%" }} />
-      <Hotspot active={stepIndex === 2} label="تحميل اللوحة" style={{ left: "70%", top: "62%" }} />
-      <Hotspot active={stepIndex === 3} label="إغلاق الغطاء" style={{ left: "70%", top: "42%" }} />
-      <Hotspot active={stepIndex === 4} label="بدء الدورات" style={{ left: "30%", top: "40%" }} />
+      <Hotspot active={stepIndex === 0} done={stepIndex > 0} label="إدخال العينة" style={{ left: "20%", top: "62%" }} />
+      <Hotspot active={stepIndex === 1} done={stepIndex > 1} label="Master Mix" style={{ left: "22%", top: "78%" }} />
+      <Hotspot active={stepIndex === 2} done={stepIndex > 2} label="تحميل اللوحة" style={{ left: "70%", top: "62%" }} />
+      <Hotspot active={stepIndex === 3} done={stepIndex > 3} label="إغلاق الغطاء" style={{ left: "70%", top: "42%" }} />
+      <Hotspot active={stepIndex === 4} done={stepIndex > 4} label="بدء الدورات" style={{ left: "30%", top: "40%" }} />
       <Hotspot active={stepIndex >= 5} label="قراءة النتيجة" style={{ left: "35%", top: "55%" }} />
     </Chassis>
   );
@@ -340,10 +347,10 @@ function Elisa3D({ running, progress, done, stepIndex }: { running: boolean; pro
           <div className="mt-2 text-center text-[9px] text-muted-foreground">96-WELL ELISA PLATE</div>
         </div>
       </div>
-      <Hotspot active={stepIndex === 0} label="إضافة المستضد" style={{ left: "70%", top: "55%" }} />
-      <Hotspot active={stepIndex === 1} label="غسيل" style={{ left: "70%", top: "75%" }} />
-      <Hotspot active={stepIndex === 2} label="إضافة الكونجوجيت" style={{ left: "55%", top: "55%" }} />
-      <Hotspot active={stepIndex === 3} label="إضافة Substrate" style={{ left: "85%", top: "55%" }} />
+      <Hotspot active={stepIndex === 0} done={stepIndex > 0} label="إضافة المستضد" style={{ left: "70%", top: "55%" }} />
+      <Hotspot active={stepIndex === 1} done={stepIndex > 1} label="غسيل" style={{ left: "70%", top: "75%" }} />
+      <Hotspot active={stepIndex === 2} done={stepIndex > 2} label="إضافة الكونجوجيت" style={{ left: "55%", top: "55%" }} />
+      <Hotspot active={stepIndex === 3} done={stepIndex > 3} label="إضافة Substrate" style={{ left: "85%", top: "55%" }} />
       <Hotspot active={stepIndex >= 4} label="القراءة 450nm" style={{ left: "25%", top: "55%" }} />
     </Chassis>
   );
@@ -400,9 +407,9 @@ function Gel3D({ running, progress, done, stepIndex }: { running: boolean; progr
           <span>+ ANODE</span>
         </div>
       </div>
-      <Hotspot active={stepIndex === 0} label="صب الجل" style={{ left: "50%", top: "55%" }} />
-      <Hotspot active={stepIndex === 1} label="تحميل العينات" style={{ left: "50%", top: "45%" }} />
-      <Hotspot active={stepIndex === 2} label="تشغيل التيار" style={{ left: "88%", top: "30%" }} />
+      <Hotspot active={stepIndex === 0} done={stepIndex > 0} label="صب الجل" style={{ left: "50%", top: "55%" }} />
+      <Hotspot active={stepIndex === 1} done={stepIndex > 1} label="تحميل العينات" style={{ left: "50%", top: "45%" }} />
+      <Hotspot active={stepIndex === 2} done={stepIndex > 2} label="تشغيل التيار" style={{ left: "88%", top: "30%" }} />
       <Hotspot active={stepIndex >= 3} label="UV Imaging" style={{ left: "20%", top: "70%" }} />
     </Chassis>
   );
@@ -534,8 +541,8 @@ function Culture3D({ running, done, stepIndex }: { running: boolean; done: boole
           <span>{done ? "✓ نمو مستعمرات" : running ? "⌛ حضانة 24h" : "⏸"}</span>
         </div>
       </div>
-      <Hotspot active={stepIndex === 0} label="تلقيح الطبق" style={{ left: "30%", top: "50%" }} />
-      <Hotspot active={stepIndex === 1} label="إغلاق الباب" style={{ left: "85%", top: "55%" }} />
+      <Hotspot active={stepIndex === 0} done={stepIndex > 0} label="تلقيح الطبق" style={{ left: "30%", top: "50%" }} />
+      <Hotspot active={stepIndex === 1} done={stepIndex > 1} label="إغلاق الباب" style={{ left: "85%", top: "55%" }} />
       <Hotspot active={stepIndex >= 2} label="قراءة المستعمرات" style={{ left: "50%", top: "70%" }} />
     </Chassis>
   );
@@ -591,8 +598,8 @@ function Flow3D({ running, done, stepIndex }: { running: boolean; done: boolean;
           </div>
         </Screen>
       </div>
-      <Hotspot active={stepIndex === 0} label="تحضير العينة" style={{ left: "50%", top: "85%" }} />
-      <Hotspot active={stepIndex === 1} label="تحميل الأنبوب" style={{ left: "90%", top: "55%" }} />
+      <Hotspot active={stepIndex === 0} done={stepIndex > 0} label="تحضير العينة" style={{ left: "50%", top: "85%" }} />
+      <Hotspot active={stepIndex === 1} done={stepIndex > 1} label="تحميل الأنبوب" style={{ left: "90%", top: "55%" }} />
       <Hotspot active={stepIndex >= 2} label="قراءة Gating" style={{ left: "30%", top: "55%" }} />
     </Chassis>
   );
@@ -675,8 +682,8 @@ function Scope3D({ running, done, stepIndex }: { running: boolean; done: boolean
         </div>
         <div className="absolute inset-x-0 bottom-1 text-center text-[9px] text-primary">{done ? "1000x ✓" : running ? "تركيز…" : "ضع الشريحة"}</div>
       </div>
-      <Hotspot active={stepIndex === 0} label="ضع الشريحة" style={{ left: "60%", top: "65%" }} />
-      <Hotspot active={stepIndex === 1} label="بدّل العدسة" style={{ left: "65%", top: "50%" }} />
+      <Hotspot active={stepIndex === 0} done={stepIndex > 0} label="ضع الشريحة" style={{ left: "60%", top: "65%" }} />
+      <Hotspot active={stepIndex === 1} done={stepIndex > 1} label="بدّل العدسة" style={{ left: "65%", top: "50%" }} />
       <Hotspot active={stepIndex >= 2} label="اضبط التركيز" style={{ left: "75%", top: "55%" }} />
     </div>
   );
