@@ -264,12 +264,16 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
         <div className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_1fr]">
           {/* LEFT: machine */}
           <section className="space-y-4">
-            <MachineVisual
+            <Lab3D
               variant={instrument.resultVisual ?? "culture"}
               running={running}
               progress={progress}
               done={done}
+              stepIndex={currentStep}
+              stepTitle={step?.title}
+              totalSteps={instrument.steps.length}
             />
+
 
             {/* Current step controls */}
             {!done && step && (
