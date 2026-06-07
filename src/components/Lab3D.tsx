@@ -193,23 +193,30 @@ function LED({ on, color = "oklch(0.78 0.18 165)" }: { on?: boolean; color?: str
   );
 }
 
-function Hotspot({ active, label, style }: { active: boolean; label: string; style?: React.CSSProperties }) {
+function Hotspot({ active, done, label, style }: { active: boolean; done?: boolean; label: string; style?: React.CSSProperties }) {
+  const state = active ? "active" : done ? "done" : "idle";
+  const ring =
+    state === "active"
+      ? "border-toxic bg-toxic/40 animate-ping"
+      : state === "done"
+      ? "border-primary bg-primary/50"
+      : "border-border/40 bg-background/40";
+  const labelCls =
+    state === "active"
+      ? "border-toxic/60 bg-background/95 text-toxic"
+      : state === "done"
+      ? "border-primary/50 bg-background/90 text-primary"
+      : "border-border/40 bg-background/70 text-muted-foreground";
   return (
-    <div
-      className="absolute z-10 -translate-x-1/2 -translate-y-1/2"
-      style={style}
-    >
-      <span
-        className={`block size-5 rounded-full border-2 ${active ? "border-toxic bg-toxic/40 animate-ping" : "border-border/40 bg-background/40"}`}
-      />
-      {active && (
-        <span className="absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap rounded-md border border-toxic/50 bg-background/90 px-2 py-0.5 text-[10px] font-bold text-toxic">
-          {label}
-        </span>
-      )}
+    <div className="absolute z-10 -translate-x-1/2 -translate-y-1/2" style={style}>
+      <span className={`block size-5 rounded-full border-2 ${ring}`} />
+      <span className={`absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[9px] font-bold ${labelCls}`}>
+        {state === "done" ? "✓ " : state === "active" ? "● " : ""}{label}
+      </span>
     </div>
   );
 }
+
 
 /* ===================== PCR ===================== */
 
