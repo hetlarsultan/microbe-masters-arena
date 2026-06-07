@@ -806,15 +806,19 @@ function MedicalReport({
         <ol className="space-y-1.5 text-sm">
           {instrument.steps.map((s, i) => {
             const isDone = completed.includes(s.id);
+            const res = stepResults[s.id];
+            const dur = stepDurations[s.id];
             return (
               <li key={s.id} className="flex items-center justify-between rounded-lg border border-border bg-background/40 px-3 py-2">
                 <div className="flex items-center gap-2">
-                  <span className={`grid size-6 place-items-center rounded-full text-[10px] font-bold ${isDone ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
-                    {isDone ? "✓" : i + 1}
+                  <span className={`grid size-6 place-items-center rounded-full text-[10px] font-bold ${isDone ? (res === "err" ? "bg-destructive text-destructive-foreground" : "bg-primary text-primary-foreground") : "bg-secondary text-muted-foreground"}`}>
+                    {isDone ? (res === "err" ? "✕" : "✓") : i + 1}
                   </span>
                   <span className="font-medium">{s.title}</span>
                 </div>
-                <span className="font-mono text-[10px] text-muted-foreground">{stepTimes[s.id] ?? "—"}</span>
+                <span className="font-mono text-[10px] text-muted-foreground">
+                  {dur != null ? `${(dur / 1000).toFixed(1)}ث · ` : ""}{stepTimes[s.id] ?? "—"}
+                </span>
               </li>
             );
           })}
