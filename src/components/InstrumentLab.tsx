@@ -342,6 +342,8 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
                 completedAt={new Date()}
                 completed={completed}
                 stepTimes={stepTimes}
+                stepDurations={stepDurations}
+                stepResults={stepResults}
                 errors={errors}
                 mode={mode}
                 onReset={reset}
