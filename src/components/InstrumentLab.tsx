@@ -134,6 +134,9 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
   const [logs, setLogs] = useState<string[]>([`[init] جهاز ${instrument.name} جاهز للتشغيل`]);
   const [errors, setErrors] = useState<{ stepId: string; stepTitle: string; note: string; time: string }[]>([]);
   const [stepTimes, setStepTimes] = useState<Record<string, string>>({});
+  const [stepDurations, setStepDurations] = useState<Record<string, number>>({});
+  const [stepResults, setStepResults] = useState<Record<string, "ok" | "err">>({});
+  const [stepStart, setStepStart] = useState<number>(() => Date.now());
   const [patientId] = useState(() => `PT-${Math.floor(Math.random() * 9000 + 1000)}`);
   const [startedAt] = useState(() => new Date());
 
@@ -147,8 +150,9 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instrument.id]);
 
-  // Speak step mentor text when step changes (training mode only)
+  // Speak step mentor text when step changes (training mode only) + reset step timer
   useEffect(() => {
+    setStepStart(Date.now());
     if (mode !== "training" || !voiceOn || !step) return;
     const text = step.mentor || step.detail;
     if (text) speak(`الخطوة ${currentStep + 1}: ${step.title}. ${text}`);
@@ -166,9 +170,13 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
         clearInterval(id);
         setRunning(false);
         setCompleted((c) => [...c, step.id]);
-        const t = new Date().toLocaleTimeString("ar-EG");
+        const now = new Date();
+        const t = now.toLocaleTimeString("ar-EG");
+        const elapsedMs = now.getTime() - stepStart;
         setStepTimes((m) => ({ ...m, [step.id]: t }));
-        setLogs((l) => [...l, `[ok] ✓ ${step.title} — ${t}`]);
+        setStepDurations((m) => ({ ...m, [step.id]: elapsedMs }));
+        setStepResults((m) => (m[step.id] === "err" ? m : { ...m, [step.id]: "ok" }));
+        setLogs((l) => [...l, `[ok] ✓ ${step.title} — ${t} (${(elapsedMs / 1000).toFixed(1)}ث)`]);
         if (currentStep + 1 >= instrument.steps.length) {
           setDone(true);
         } else {
@@ -178,12 +186,13 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
       }
     }, 60);
     return () => clearInterval(id);
-  }, [running, step, currentStep, instrument.steps.length]);
+  }, [running, step, currentStep, instrument.steps.length, stepStart]);
 
   function logError(note: string) {
     if (!step) return;
     const time = new Date().toLocaleTimeString("ar-EG");
     setErrors((e) => [...e, { stepId: step.id, stepTitle: step.title, note, time }]);
+    setStepResults((m) => ({ ...m, [step.id]: "err" }));
     setLogs((l) => [...l, `[err] ⚠ ${step.title}: ${note}`]);
   }
 
@@ -195,6 +204,9 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
     setDone(false);
     setErrors([]);
     setStepTimes({});
+    setStepDurations({});
+    setStepResults({});
+    setStepStart(Date.now());
     setLogs([`[reset] إعادة تشغيل ${instrument.name}`]);
   }
 
