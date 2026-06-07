@@ -385,12 +385,16 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
                 {instrument.steps.map((s, i) => {
                   const isDone = completed.includes(s.id);
                   const isCurrent = i === currentStep && !done;
+                  const res = stepResults[s.id];
+                  const dur = stepDurations[s.id];
                   return (
                     <li
                       key={s.id}
                       className={`flex items-center gap-3 rounded-xl border p-3 text-sm transition-all ${
                         isDone
-                          ? "border-primary/40 bg-primary/5 text-primary"
+                          ? res === "err"
+                            ? "border-destructive/50 bg-destructive/5 text-destructive"
+                            : "border-primary/40 bg-primary/5 text-primary"
                           : isCurrent
                           ? "border-toxic bg-toxic/5"
                           : "border-border bg-background/40 text-muted-foreground"
@@ -399,20 +403,40 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
                       <span
                         className={`grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold ${
                           isDone
-                            ? "bg-primary text-primary-foreground"
+                            ? res === "err"
+                              ? "bg-destructive text-destructive-foreground"
+                              : "bg-primary text-primary-foreground"
                             : isCurrent
                             ? "bg-toxic text-background animate-pulse"
                             : "bg-secondary"
                         }`}
                       >
-                        {isDone ? "✓" : i + 1}
+                        {isDone ? (res === "err" ? "✕" : "✓") : i + 1}
                       </span>
                       <span className="flex-1 font-medium">{s.title}</span>
+                      {isDone && (
+                        <span className="font-mono text-[10px] opacity-80">
+                          {dur != null ? `${(dur / 1000).toFixed(1)}ث` : ""} · {stepTimes[s.id]}
+                        </span>
+                      )}
                     </li>
                   );
                 })}
               </ol>
             </div>
+
+            {/* LIVE CASE REPORT — updates instantly after each step */}
+            <LiveCaseReport
+              instrument={instrument}
+              patientId={patientId}
+              startedAt={startedAt}
+              completed={completed}
+              stepTimes={stepTimes}
+              stepDurations={stepDurations}
+              stepResults={stepResults}
+              errors={errors}
+              done={done}
+            />
 
             {/* Console log */}
             <div className="rounded-2xl border border-border bg-background/60 p-4">
