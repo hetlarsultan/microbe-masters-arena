@@ -567,6 +567,10 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
               stepResults={stepResults}
               errors={errors}
               done={done}
+              mode={mode}
+              onReplay={startReplay}
+              canReplay={completed.length > 0 && !replayMode}
+              replaying={replayMode}
             />
 
             {/* Console log */}
