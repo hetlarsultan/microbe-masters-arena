@@ -145,6 +145,7 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
   const [progress, setProgress] = useState(0);
   const [done, setDone] = useState(false);
   const [mode, setMode] = useState<"training" | "exam">("training");
+  const [runMode, setRunMode] = useState<"auto" | "manual">("manual");
   const [voiceOn, setVoiceOn] = useState(true);
   const [logs, setLogs] = useState<string[]>([`[init] جهاز ${instrument.name} جاهز للتشغيل`]);
   const [errors, setErrors] = useState<ErrorEntry[]>([]);
