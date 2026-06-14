@@ -454,6 +454,20 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
                       <div className="h-full bg-primary transition-all" style={{ width: `${progress}%` }} />
                     </div>
                   </div>
+                ) : runMode === "manual" ? (
+                  <ManualPanel
+                    instrumentId={instrument.id}
+                    stepIndex={currentStep}
+                    actionLabel={step.action}
+                    title={step.title}
+                    onCorrect={() => {
+                      setRunning(true);
+                      setLogs((l) => [...l, `[manual] ✓ اختيار صحيح — ${step.action}…`]);
+                    }}
+                    onWrong={(picked) => {
+                      logError(`اختيار خاطئ في الوضع اليدوي: ${picked}`);
+                    }}
+                  />
                 ) : (
                   <div className="mt-4 flex gap-2">
                     <button
