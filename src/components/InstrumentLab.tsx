@@ -1264,3 +1264,118 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
+
+/* ============================ PATIENT SAMPLE CARD ============================ */
+
+function PatientSampleCard({ sample, patientId, branch }: { sample: SampleCard; patientId: string; branch: string }) {
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3">
+      <div
+        className="relative grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-xl border border-border text-3xl shadow-inner"
+        style={{ background: sample.bg }}
+      >
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,.18),transparent_60%)]" />
+        <span className="relative drop-shadow">{sample.emoji}</span>
+        <div className="absolute bottom-0 left-0 right-0 bg-black/40 px-1 py-0.5 text-center text-[8px] tracking-widest text-white/80">SAMPLE</div>
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-[10px] font-bold tracking-widest text-primary">🧫 عينة المريض</div>
+        <div className="mt-0.5 truncate text-sm font-bold">{sample.label}</div>
+        {sample.hint && <div className="truncate text-[11px] text-muted-foreground">{sample.hint}</div>}
+        <div className="mt-1 flex flex-wrap gap-1 text-[9px]">
+          <span className="rounded-full border border-border bg-background/60 px-2 py-0.5 font-mono">{patientId}</span>
+          <span className="rounded-full border border-border bg-background/60 px-2 py-0.5">{branch}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================ MANUAL ACTION PANEL ============================ */
+
+function ManualPanel({
+  instrumentId,
+  stepIndex,
+  actionLabel,
+  title,
+  onCorrect,
+  onWrong,
+}: {
+  instrumentId: string;
+  stepIndex: number;
+  actionLabel: string;
+  title: string;
+  onCorrect: () => void;
+  onWrong: (pickedLabel: string) => void;
+}) {
+  const { correctId, cards } = useMemo(
+    () => buildStepChoices(instrumentId, actionLabel, title, stepIndex),
+    [instrumentId, actionLabel, title, stepIndex]
+  );
+  const [picked, setPicked] = useState<string | null>(null);
+  const [wrongIds, setWrongIds] = useState<string[]>([]);
+
+  // reset when step changes
+  useEffect(() => {
+    setPicked(null);
+    setWrongIds([]);
+  }, [stepIndex, instrumentId]);
+
+  function handlePick(card: SampleCard) {
+    if (picked) return;
+    if (card.id === correctId) {
+      setPicked(card.id);
+      onCorrect();
+    } else {
+      setWrongIds((w) => (w.includes(card.id) ? w : [...w, card.id]));
+      onWrong(card.label);
+    }
+  }
+
+  return (
+    <div className="mt-4 space-y-3">
+      <div className="flex items-center justify-between text-[11px]">
+        <span className="font-bold tracking-widest text-toxic">🖐 الوضع اليدوي — اختر الأداة/الكاشف الصحيح</span>
+        <span className="text-muted-foreground">{wrongIds.length > 0 ? `أخطاء: ${wrongIds.length}` : "اضغط على البطاقة الصحيحة"}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        {cards.map((c) => {
+          const isWrong = wrongIds.includes(c.id);
+          const isRight = picked === c.id;
+          return (
+            <button
+              key={c.id}
+              onClick={() => handlePick(c)}
+              disabled={!!picked || isWrong}
+              className={`group relative overflow-hidden rounded-xl border p-2 text-right transition-all ${
+                isRight
+                  ? "border-primary bg-primary/10 ring-2 ring-primary"
+                  : isWrong
+                  ? "border-destructive/60 bg-destructive/10 opacity-50"
+                  : "border-border bg-background/40 hover:-translate-y-0.5 hover:border-toxic/60"
+              }`}
+            >
+              <div
+                className="relative grid h-20 w-full place-items-center overflow-hidden rounded-lg text-4xl"
+                style={{ background: c.bg }}
+              >
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,.2),transparent_60%)]" />
+                <span className="relative drop-shadow">{c.emoji}</span>
+                {isRight && (
+                  <div className="absolute inset-0 grid place-items-center bg-primary/30 text-2xl">✓</div>
+                )}
+                {isWrong && (
+                  <div className="absolute inset-0 grid place-items-center bg-destructive/40 text-2xl">✕</div>
+                )}
+              </div>
+              <div className="mt-1.5 truncate text-xs font-semibold">{c.label}</div>
+            </button>
+          );
+        })}
+      </div>
+      <p className="text-[10px] text-muted-foreground">
+        💡 طابِق البطاقة مع تعليمات د. المشرف — البطاقة الخاطئة تُسجَّل كخطأ مخبري في التقرير.
+      </p>
+    </div>
+  );
+}
