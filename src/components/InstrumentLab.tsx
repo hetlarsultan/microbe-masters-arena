@@ -123,7 +123,21 @@ function speak(text: string) {
   } catch {}
 }
 
+type ErrorEntry = { stepId: string; stepTitle: string; note: string; time: string };
+type SavedProgress = {
+  currentStep: number;
+  completed: string[];
+  stepTimes: Record<string, string>;
+  stepDurations: Record<string, number>;
+  stepResults: Record<string, "ok" | "err">;
+  errors: ErrorEntry[];
+  done: boolean;
+  savedAt: number;
+};
+
 function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBack: () => void }) {
+  const STORAGE_KEY = `microlab.progress.${instrument.id}`;
+
   const [currentStep, setCurrentStep] = useState(0);
   const [completed, setCompleted] = useState<string[]>([]);
   const [running, setRunning] = useState(false);
@@ -132,16 +146,42 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
   const [mode, setMode] = useState<"training" | "exam">("training");
   const [voiceOn, setVoiceOn] = useState(true);
   const [logs, setLogs] = useState<string[]>([`[init] جهاز ${instrument.name} جاهز للتشغيل`]);
-  const [errors, setErrors] = useState<{ stepId: string; stepTitle: string; note: string; time: string }[]>([]);
+  const [errors, setErrors] = useState<ErrorEntry[]>([]);
   const [stepTimes, setStepTimes] = useState<Record<string, string>>({});
   const [stepDurations, setStepDurations] = useState<Record<string, number>>({});
   const [stepResults, setStepResults] = useState<Record<string, "ok" | "err">>({});
   const [stepStart, setStepStart] = useState<number>(() => Date.now());
   const [patientId] = useState(() => `PT-${Math.floor(Math.random() * 9000 + 1000)}`);
   const [startedAt] = useState(() => new Date());
+  const [resumable, setResumable] = useState<SavedProgress | null>(null);
+  const [replayMode, setReplayMode] = useState(false);
+  const [speakingNow, setSpeakingNow] = useState<string | null>(null);
 
   const step = instrument.steps[currentStep];
   const pct = (completed.length / instrument.steps.length) * 100;
+
+  // Detect saved progress on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw) as SavedProgress;
+      if (data && data.currentStep > 0 && !data.done) setResumable(data);
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instrument.id]);
+
+  // Auto-save progress (skip during replay)
+  useEffect(() => {
+    if (replayMode) return;
+    try {
+      const data: SavedProgress = {
+        currentStep, completed, stepTimes, stepDurations, stepResults, errors, done,
+        savedAt: Date.now(),
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch {}
+  }, [STORAGE_KEY, currentStep, completed, stepTimes, stepDurations, stepResults, errors, done, replayMode]);
 
   // Speak mentor intro on mount
   useEffect(() => {
@@ -150,17 +190,20 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instrument.id]);
 
-  // Speak step mentor text when step changes (training mode only) + reset step timer
+  // Mentor sync — speak when the *current step* changes and surface what is being said
   useEffect(() => {
     setStepStart(Date.now());
-    if (mode !== "training" || !voiceOn || !step) return;
+    if (!step || done) { setSpeakingNow(null); return; }
+    if (mode !== "training" || !voiceOn) { setSpeakingNow(step.title); return; }
     const text = step.mentor || step.detail;
-    if (text) speak(`الخطوة ${currentStep + 1}: ${step.title}. ${text}`);
+    const spoken = `الخطوة ${currentStep + 1}: ${step.title}. ${text ?? ""}`.trim();
+    setSpeakingNow(spoken);
+    if (text) speak(spoken);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentStep, instrument.id]);
+  }, [currentStep, instrument.id, done]);
 
   useEffect(() => {
-    if (!running || !step) return;
+    if (!running || !step || replayMode) return;
     const duration = step.duration ?? 1000;
     const start = Date.now();
     const id = setInterval(() => {
@@ -186,7 +229,7 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
       }
     }, 60);
     return () => clearInterval(id);
-  }, [running, step, currentStep, instrument.steps.length, stepStart]);
+  }, [running, step, currentStep, instrument.steps.length, stepStart, replayMode]);
 
   function logError(note: string) {
     if (!step) return;
@@ -207,7 +250,71 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
     setStepDurations({});
     setStepResults({});
     setStepStart(Date.now());
+    setReplayMode(false);
     setLogs([`[reset] إعادة تشغيل ${instrument.name}`]);
+    try { localStorage.removeItem(STORAGE_KEY); } catch {}
+  }
+
+  function resumeSaved() {
+    if (!resumable) return;
+    setCurrentStep(resumable.currentStep);
+    setCompleted(resumable.completed);
+    setStepTimes(resumable.stepTimes);
+    setStepDurations(resumable.stepDurations);
+    setStepResults(resumable.stepResults);
+    setErrors(resumable.errors);
+    setDone(resumable.done);
+    setStepStart(Date.now());
+    setLogs((l) => [...l, `[resume] استئناف من الخطوة ${resumable.currentStep + 1}`]);
+    setResumable(null);
+  }
+
+  function dismissResume() {
+    setResumable(null);
+    try { localStorage.removeItem(STORAGE_KEY); } catch {}
+  }
+
+  async function startReplay() {
+    if (completed.length === 0) return;
+    if (typeof window !== "undefined") window.speechSynthesis?.cancel();
+    const recordedIds = [...completed];
+    const savedTimes = { ...stepTimes };
+    const savedDurs = { ...stepDurations };
+    const savedResults = { ...stepResults };
+    setReplayMode(true);
+    setRunning(false);
+    setDone(false);
+    setProgress(0);
+    setCompleted([]);
+    setLogs((l) => [...l, `[replay] ▶ إعادة المحاكاة (${recordedIds.length} خطوة)`]);
+
+    for (let i = 0; i < recordedIds.length; i++) {
+      const id = recordedIds[i];
+      const idx = instrument.steps.findIndex((s) => s.id === id);
+      if (idx < 0) continue;
+      const sObj = instrument.steps[idx];
+      setCurrentStep(idx);
+      setProgress(0);
+      setRunning(true);
+      if (voiceOn) speak(`إعادة الخطوة ${idx + 1}: ${sObj.title}`);
+      const dur = Math.min(Math.max(savedDurs[id] ?? 1000, 400), 2500);
+      const start = Date.now();
+      await new Promise<void>((resolve) => {
+        const t = setInterval(() => {
+          const p = Math.min(100, ((Date.now() - start) / dur) * 100);
+          setProgress(p);
+          if (p >= 100) { clearInterval(t); resolve(); }
+        }, 50);
+      });
+      setRunning(false);
+      setCompleted((c) => [...c, id]);
+    }
+    setStepTimes(savedTimes);
+    setStepDurations(savedDurs);
+    setStepResults(savedResults);
+    setDone(true);
+    setReplayMode(false);
+    setLogs((l) => [...l, `[replay] ✓ انتهت إعادة المحاكاة`]);
   }
 
 
