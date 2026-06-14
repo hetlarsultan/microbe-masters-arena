@@ -377,7 +377,31 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
               style={{ width: `${pct}%` }}
             />
           </div>
+
+          {/* Resume banner */}
+          {resumable && (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-toxic/50 bg-toxic/10 p-3 text-sm">
+              <div className="flex items-center gap-2 text-foreground/90">
+                <span className="text-lg">⏸</span>
+                <span>توجد جلسة محفوظة عند الخطوة <b>{resumable.currentStep + 1}</b> — {new Date(resumable.savedAt).toLocaleString("ar-EG")}</span>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={resumeSaved} className="rounded-full bg-toxic px-3 py-1 text-xs font-bold text-background">↩ استئناف من آخر خطوة</button>
+                <button onClick={dismissResume} className="rounded-full border border-border bg-background/60 px-3 py-1 text-xs">تجاهل</button>
+              </div>
+            </div>
+          )}
+
+          {/* Mentor sync chip */}
+          {!done && speakingNow && (
+            <div className="mt-3 flex items-center gap-2 rounded-full border border-primary/30 bg-primary/5 px-3 py-1.5 text-[11px] text-primary">
+              <span className="size-2 animate-pulse rounded-full bg-primary" />
+              <span className="font-bold tracking-widest">SYNC</span>
+              <span className="truncate text-foreground/80">🔊 الموجه: {speakingNow}</span>
+            </div>
+          )}
         </header>
+
 
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_1fr]">
