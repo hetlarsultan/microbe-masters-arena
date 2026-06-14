@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { INSTRUMENTS, INSTRUMENT_BRANCHES, type Instrument } from "@/lib/instruments";
 import { Lab3D } from "@/components/Lab3D";
+import { buildStepChoices, getPatientSample, type SampleCard } from "@/lib/manualActions";
 
 
 type View = "list" | "run";
