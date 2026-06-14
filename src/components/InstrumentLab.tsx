@@ -1050,6 +1050,10 @@ function LiveCaseReport({
   stepResults,
   errors,
   done,
+  mode,
+  onReplay,
+  canReplay,
+  replaying,
 }: {
   instrument: Instrument;
   patientId: string;
@@ -1060,12 +1064,70 @@ function LiveCaseReport({
   stepResults: Record<string, "ok" | "err">;
   errors: { stepId: string; stepTitle: string; note: string; time: string }[];
   done: boolean;
+  mode: "training" | "exam";
+  onReplay: () => void;
+  canReplay: boolean;
+  replaying: boolean;
 }) {
   const total = instrument.steps.length;
   const doneCount = completed.length;
   const errCount = errors.length;
   const okCount = doneCount - errCount;
   const totalSec = Object.values(stepDurations).reduce((a, b) => a + b, 0) / 1000;
+
+  function exportPDF() {
+    const rows = instrument.steps.map((s, i) => {
+      const isDone = completed.includes(s.id);
+      const res = stepResults[s.id];
+      const dur = stepDurations[s.id];
+      const status = isDone ? (res === "err" ? "✕ خطأ" : "✓ صح") : "—";
+      const cls = res === "err" ? "err" : isDone ? "ok" : "muted";
+      return `<tr><td>${i + 1}</td><td>${escapeHtml(s.title)}</td><td class="${cls}">${status}</td><td>${dur != null ? (dur / 1000).toFixed(1) + "ث" : "—"}</td><td>${stepTimes[s.id] ?? "—"}</td></tr>`;
+    }).join("");
+
+    const errBlock = errCount
+      ? `<div class="box err-box"><b>⚠ الأخطاء المسجلة (${errCount}):</b><ul>${errors
+          .map((e) => `<li>[${e.time}] ${escapeHtml(e.stepTitle)} — ${escapeHtml(e.note)}</li>`)
+          .join("")}</ul></div>`
+      : `<div class="box ok-box">✓ لا توجد أخطاء — أداء مثالي.</div>`;
+
+    const html = `<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>تقرير الحالة ${patientId}</title>
+<style>
+  *{box-sizing:border-box} body{font-family:'Segoe UI',Tahoma,sans-serif;color:#111;padding:28px;background:#fff}
+  h1{margin:0 0 6px;font-size:22px} .sub{color:#555;font-size:12px;margin-bottom:14px}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}
+  .stat{border:1px solid #ddd;border-radius:8px;padding:8px;text-align:center}
+  .stat b{display:block;font-size:18px;margin-top:4px}
+  table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12px}
+  th,td{border:1px solid #ddd;padding:6px 8px;text-align:right}
+  th{background:#f4f4f4}
+  .ok{color:#0a7d2c;font-weight:bold} .err{color:#b00020;font-weight:bold} .muted{color:#888}
+  .box{border:1px solid #ddd;border-radius:8px;padding:10px;margin-top:12px;font-size:12px}
+  .err-box{border-color:#b00020;background:#fff4f4;color:#b00020}
+  .ok-box{border-color:#0a7d2c;background:#f3fbf5;color:#0a7d2c}
+  .diagnosis{border:2px solid #0a4d8a;background:#eef5ff;border-radius:10px;padding:12px;margin-top:14px}
+  @media print{body{padding:14px}}
+</style></head><body>
+<h1>تقرير الحالة المباشر — ${escapeHtml(instrument.name)}</h1>
+<div class="sub">رقم المريض: <b>${patientId}</b> · القسم: ${escapeHtml(instrument.branch)} · الوضع: ${mode === "training" ? "تدريب" : "امتحان"} · بدء الجلسة: ${startedAt.toLocaleString("ar-EG")} · طباعة: ${new Date().toLocaleString("ar-EG")}</div>
+<div class="grid">
+  <div class="stat">الخطوات<b>${doneCount}/${total}</b></div>
+  <div class="stat" style="color:#0a7d2c">صح<b>${okCount}</b></div>
+  <div class="stat" style="color:#b00020">خطأ<b>${errCount}</b></div>
+  <div class="stat">المدة الكلية<b>${totalSec.toFixed(1)}ث</b></div>
+</div>
+<table><thead><tr><th>#</th><th>الخطوة</th><th>النتيجة</th><th>المدة</th><th>الوقت</th></tr></thead><tbody>${rows}</tbody></table>
+${errBlock}
+${done ? `<div class="diagnosis"><b>🩺 التشخيص النهائي:</b> ${escapeHtml(instrument.finalResult)}</div>` : ""}
+<div class="sub" style="margin-top:24px">توقيع المشرف: د. ـــــــــــــــــــــــــ &nbsp;&nbsp; ختم المختبر 🧪</div>
+<script>window.onload=function(){setTimeout(function(){window.print();},350);};</script>
+</body></html>`;
+    const w = window.open("", "_blank", "noopener,noreferrer,width=900,height=1100");
+    if (!w) return;
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+  }
 
   return (
     <div className="rounded-2xl border border-primary/30 bg-card p-5">
