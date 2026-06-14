@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { INSTRUMENTS, INSTRUMENT_BRANCHES, type Instrument } from "@/lib/instruments";
 import { Lab3D } from "@/components/Lab3D";
+import { buildStepChoices, getPatientSample, type SampleCard } from "@/lib/manualActions";
 
 
 type View = "list" | "run";
@@ -144,6 +145,7 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
   const [progress, setProgress] = useState(0);
   const [done, setDone] = useState(false);
   const [mode, setMode] = useState<"training" | "exam">("training");
+  const [runMode, setRunMode] = useState<"auto" | "manual">("manual");
   const [voiceOn, setVoiceOn] = useState(true);
   const [logs, setLogs] = useState<string[]>([`[init] جهاز ${instrument.name} جاهز للتشغيل`]);
   const [errors, setErrors] = useState<ErrorEntry[]>([]);
@@ -351,6 +353,10 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
               <button onClick={() => { setVoiceOn(v => !v); window.speechSynthesis?.cancel(); }} className="rounded-full border border-border bg-background/40 px-3 py-1 text-xs">
                 {voiceOn ? "🔊 صوت الدكتور" : "🔇 صامت"}
               </button>
+              <div className="flex items-center gap-1 rounded-full border border-border bg-background/40 p-1 text-xs">
+                <button onClick={() => setRunMode("manual")} className={`rounded-full px-3 py-1 ${runMode === "manual" ? "bg-toxic text-background" : "text-muted-foreground"}`}>🖐 يدوي</button>
+                <button onClick={() => setRunMode("auto")} className={`rounded-full px-3 py-1 ${runMode === "auto" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>⚙ تلقائي</button>
+              </div>
             </div>
           </div>
 
@@ -407,6 +413,12 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
         <div className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_1fr]">
           {/* LEFT: machine */}
           <section className="space-y-4">
+            <PatientSampleCard
+              sample={getPatientSample(instrument.id, String(instrument.branch))}
+              patientId={patientId}
+              branch={String(instrument.branch)}
+            />
+
             <Lab3D
               variant={instrument.resultVisual ?? "culture"}
               running={running}
@@ -442,6 +454,20 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
                       <div className="h-full bg-primary transition-all" style={{ width: `${progress}%` }} />
                     </div>
                   </div>
+                ) : runMode === "manual" ? (
+                  <ManualPanel
+                    instrumentId={instrument.id}
+                    stepIndex={currentStep}
+                    actionLabel={step.action}
+                    title={step.title}
+                    onCorrect={() => {
+                      setRunning(true);
+                      setLogs((l) => [...l, `[manual] ✓ اختيار صحيح — ${step.action}…`]);
+                    }}
+                    onWrong={(picked) => {
+                      logError(`اختيار خاطئ في الوضع اليدوي: ${picked}`);
+                    }}
+                  />
                 ) : (
                   <div className="mt-4 flex gap-2">
                     <button
@@ -1237,4 +1263,119 @@ function escapeHtml(s: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+/* ============================ PATIENT SAMPLE CARD ============================ */
+
+function PatientSampleCard({ sample, patientId, branch }: { sample: SampleCard; patientId: string; branch: string }) {
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3">
+      <div
+        className="relative grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-xl border border-border text-3xl shadow-inner"
+        style={{ background: sample.bg }}
+      >
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,.18),transparent_60%)]" />
+        <span className="relative drop-shadow">{sample.emoji}</span>
+        <div className="absolute bottom-0 left-0 right-0 bg-black/40 px-1 py-0.5 text-center text-[8px] tracking-widest text-white/80">SAMPLE</div>
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-[10px] font-bold tracking-widest text-primary">🧫 عينة المريض</div>
+        <div className="mt-0.5 truncate text-sm font-bold">{sample.label}</div>
+        {sample.hint && <div className="truncate text-[11px] text-muted-foreground">{sample.hint}</div>}
+        <div className="mt-1 flex flex-wrap gap-1 text-[9px]">
+          <span className="rounded-full border border-border bg-background/60 px-2 py-0.5 font-mono">{patientId}</span>
+          <span className="rounded-full border border-border bg-background/60 px-2 py-0.5">{branch}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================ MANUAL ACTION PANEL ============================ */
+
+function ManualPanel({
+  instrumentId,
+  stepIndex,
+  actionLabel,
+  title,
+  onCorrect,
+  onWrong,
+}: {
+  instrumentId: string;
+  stepIndex: number;
+  actionLabel: string;
+  title: string;
+  onCorrect: () => void;
+  onWrong: (pickedLabel: string) => void;
+}) {
+  const { correctId, cards } = useMemo(
+    () => buildStepChoices(instrumentId, actionLabel, title, stepIndex),
+    [instrumentId, actionLabel, title, stepIndex]
+  );
+  const [picked, setPicked] = useState<string | null>(null);
+  const [wrongIds, setWrongIds] = useState<string[]>([]);
+
+  // reset when step changes
+  useEffect(() => {
+    setPicked(null);
+    setWrongIds([]);
+  }, [stepIndex, instrumentId]);
+
+  function handlePick(card: SampleCard) {
+    if (picked) return;
+    if (card.id === correctId) {
+      setPicked(card.id);
+      onCorrect();
+    } else {
+      setWrongIds((w) => (w.includes(card.id) ? w : [...w, card.id]));
+      onWrong(card.label);
+    }
+  }
+
+  return (
+    <div className="mt-4 space-y-3">
+      <div className="flex items-center justify-between text-[11px]">
+        <span className="font-bold tracking-widest text-toxic">🖐 الوضع اليدوي — اختر الأداة/الكاشف الصحيح</span>
+        <span className="text-muted-foreground">{wrongIds.length > 0 ? `أخطاء: ${wrongIds.length}` : "اضغط على البطاقة الصحيحة"}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        {cards.map((c) => {
+          const isWrong = wrongIds.includes(c.id);
+          const isRight = picked === c.id;
+          return (
+            <button
+              key={c.id}
+              onClick={() => handlePick(c)}
+              disabled={!!picked || isWrong}
+              className={`group relative overflow-hidden rounded-xl border p-2 text-right transition-all ${
+                isRight
+                  ? "border-primary bg-primary/10 ring-2 ring-primary"
+                  : isWrong
+                  ? "border-destructive/60 bg-destructive/10 opacity-50"
+                  : "border-border bg-background/40 hover:-translate-y-0.5 hover:border-toxic/60"
+              }`}
+            >
+              <div
+                className="relative grid h-20 w-full place-items-center overflow-hidden rounded-lg text-4xl"
+                style={{ background: c.bg }}
+              >
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,.2),transparent_60%)]" />
+                <span className="relative drop-shadow">{c.emoji}</span>
+                {isRight && (
+                  <div className="absolute inset-0 grid place-items-center bg-primary/30 text-2xl">✓</div>
+                )}
+                {isWrong && (
+                  <div className="absolute inset-0 grid place-items-center bg-destructive/40 text-2xl">✕</div>
+                )}
+              </div>
+              <div className="mt-1.5 truncate text-xs font-semibold">{c.label}</div>
+            </button>
+          );
+        })}
+      </div>
+      <p className="text-[10px] text-muted-foreground">
+        💡 طابِق البطاقة مع تعليمات د. المشرف — البطاقة الخاطئة تُسجَّل كخطأ مخبري في التقرير.
+      </p>
+    </div>
+  );
 }
