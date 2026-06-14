@@ -353,6 +353,10 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
               <button onClick={() => { setVoiceOn(v => !v); window.speechSynthesis?.cancel(); }} className="rounded-full border border-border bg-background/40 px-3 py-1 text-xs">
                 {voiceOn ? "🔊 صوت الدكتور" : "🔇 صامت"}
               </button>
+              <div className="flex items-center gap-1 rounded-full border border-border bg-background/40 p-1 text-xs">
+                <button onClick={() => setRunMode("manual")} className={`rounded-full px-3 py-1 ${runMode === "manual" ? "bg-toxic text-background" : "text-muted-foreground"}`}>🖐 يدوي</button>
+                <button onClick={() => setRunMode("auto")} className={`rounded-full px-3 py-1 ${runMode === "auto" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>⚙ تلقائي</button>
+              </div>
             </div>
           </div>
 
