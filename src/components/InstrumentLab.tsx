@@ -1139,6 +1139,25 @@ ${done ? `<div class="diagnosis"><b>🩺 التشخيص النهائي:</b> ${es
         </div>
       </div>
 
+      <div className="mb-3 flex flex-wrap gap-2">
+        <button
+          onClick={exportPDF}
+          disabled={doneCount === 0}
+          className="rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-[11px] font-bold text-primary hover:bg-primary/20 disabled:opacity-40"
+        >
+          📄 تصدير PDF
+        </button>
+        <button
+          onClick={onReplay}
+          disabled={!canReplay}
+          className="rounded-full border border-toxic/40 bg-toxic/10 px-3 py-1.5 text-[11px] font-bold text-toxic hover:bg-toxic/20 disabled:opacity-40"
+        >
+          {replaying ? "⏵ يعيد المحاكاة…" : "🔁 إعادة المحاكاة"}
+        </button>
+      </div>
+
+
+
       <div className="grid grid-cols-4 gap-2 text-center text-[10px]">
         <div className="rounded-lg border border-border bg-background/40 p-2">
           <div className="text-muted-foreground">الخطوات</div>
