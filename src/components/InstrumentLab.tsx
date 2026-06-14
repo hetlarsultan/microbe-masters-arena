@@ -413,6 +413,12 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
         <div className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_1fr]">
           {/* LEFT: machine */}
           <section className="space-y-4">
+            <PatientSampleCard
+              sample={getPatientSample(instrument.id, String(instrument.branch))}
+              patientId={patientId}
+              branch={String(instrument.branch)}
+            />
+
             <Lab3D
               variant={instrument.resultVisual ?? "culture"}
               running={running}
