@@ -123,7 +123,21 @@ function speak(text: string) {
   } catch {}
 }
 
+type ErrorEntry = { stepId: string; stepTitle: string; note: string; time: string };
+type SavedProgress = {
+  currentStep: number;
+  completed: string[];
+  stepTimes: Record<string, string>;
+  stepDurations: Record<string, number>;
+  stepResults: Record<string, "ok" | "err">;
+  errors: ErrorEntry[];
+  done: boolean;
+  savedAt: number;
+};
+
 function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBack: () => void }) {
+  const STORAGE_KEY = `microlab.progress.${instrument.id}`;
+
   const [currentStep, setCurrentStep] = useState(0);
   const [completed, setCompleted] = useState<string[]>([]);
   const [running, setRunning] = useState(false);
@@ -132,16 +146,42 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
   const [mode, setMode] = useState<"training" | "exam">("training");
   const [voiceOn, setVoiceOn] = useState(true);
   const [logs, setLogs] = useState<string[]>([`[init] جهاز ${instrument.name} جاهز للتشغيل`]);
-  const [errors, setErrors] = useState<{ stepId: string; stepTitle: string; note: string; time: string }[]>([]);
+  const [errors, setErrors] = useState<ErrorEntry[]>([]);
   const [stepTimes, setStepTimes] = useState<Record<string, string>>({});
   const [stepDurations, setStepDurations] = useState<Record<string, number>>({});
   const [stepResults, setStepResults] = useState<Record<string, "ok" | "err">>({});
   const [stepStart, setStepStart] = useState<number>(() => Date.now());
   const [patientId] = useState(() => `PT-${Math.floor(Math.random() * 9000 + 1000)}`);
   const [startedAt] = useState(() => new Date());
+  const [resumable, setResumable] = useState<SavedProgress | null>(null);
+  const [replayMode, setReplayMode] = useState(false);
+  const [speakingNow, setSpeakingNow] = useState<string | null>(null);
 
   const step = instrument.steps[currentStep];
   const pct = (completed.length / instrument.steps.length) * 100;
+
+  // Detect saved progress on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw) as SavedProgress;
+      if (data && data.currentStep > 0 && !data.done) setResumable(data);
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instrument.id]);
+
+  // Auto-save progress (skip during replay)
+  useEffect(() => {
+    if (replayMode) return;
+    try {
+      const data: SavedProgress = {
+        currentStep, completed, stepTimes, stepDurations, stepResults, errors, done,
+        savedAt: Date.now(),
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch {}
+  }, [STORAGE_KEY, currentStep, completed, stepTimes, stepDurations, stepResults, errors, done, replayMode]);
 
   // Speak mentor intro on mount
   useEffect(() => {
@@ -150,17 +190,20 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instrument.id]);
 
-  // Speak step mentor text when step changes (training mode only) + reset step timer
+  // Mentor sync — speak when the *current step* changes and surface what is being said
   useEffect(() => {
     setStepStart(Date.now());
-    if (mode !== "training" || !voiceOn || !step) return;
+    if (!step || done) { setSpeakingNow(null); return; }
+    if (mode !== "training" || !voiceOn) { setSpeakingNow(step.title); return; }
     const text = step.mentor || step.detail;
-    if (text) speak(`الخطوة ${currentStep + 1}: ${step.title}. ${text}`);
+    const spoken = `الخطوة ${currentStep + 1}: ${step.title}. ${text ?? ""}`.trim();
+    setSpeakingNow(spoken);
+    if (text) speak(spoken);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentStep, instrument.id]);
+  }, [currentStep, instrument.id, done]);
 
   useEffect(() => {
-    if (!running || !step) return;
+    if (!running || !step || replayMode) return;
     const duration = step.duration ?? 1000;
     const start = Date.now();
     const id = setInterval(() => {
@@ -186,7 +229,7 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
       }
     }, 60);
     return () => clearInterval(id);
-  }, [running, step, currentStep, instrument.steps.length, stepStart]);
+  }, [running, step, currentStep, instrument.steps.length, stepStart, replayMode]);
 
   function logError(note: string) {
     if (!step) return;
@@ -207,7 +250,71 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
     setStepDurations({});
     setStepResults({});
     setStepStart(Date.now());
+    setReplayMode(false);
     setLogs([`[reset] إعادة تشغيل ${instrument.name}`]);
+    try { localStorage.removeItem(STORAGE_KEY); } catch {}
+  }
+
+  function resumeSaved() {
+    if (!resumable) return;
+    setCurrentStep(resumable.currentStep);
+    setCompleted(resumable.completed);
+    setStepTimes(resumable.stepTimes);
+    setStepDurations(resumable.stepDurations);
+    setStepResults(resumable.stepResults);
+    setErrors(resumable.errors);
+    setDone(resumable.done);
+    setStepStart(Date.now());
+    setLogs((l) => [...l, `[resume] استئناف من الخطوة ${resumable.currentStep + 1}`]);
+    setResumable(null);
+  }
+
+  function dismissResume() {
+    setResumable(null);
+    try { localStorage.removeItem(STORAGE_KEY); } catch {}
+  }
+
+  async function startReplay() {
+    if (completed.length === 0) return;
+    if (typeof window !== "undefined") window.speechSynthesis?.cancel();
+    const recordedIds = [...completed];
+    const savedTimes = { ...stepTimes };
+    const savedDurs = { ...stepDurations };
+    const savedResults = { ...stepResults };
+    setReplayMode(true);
+    setRunning(false);
+    setDone(false);
+    setProgress(0);
+    setCompleted([]);
+    setLogs((l) => [...l, `[replay] ▶ إعادة المحاكاة (${recordedIds.length} خطوة)`]);
+
+    for (let i = 0; i < recordedIds.length; i++) {
+      const id = recordedIds[i];
+      const idx = instrument.steps.findIndex((s) => s.id === id);
+      if (idx < 0) continue;
+      const sObj = instrument.steps[idx];
+      setCurrentStep(idx);
+      setProgress(0);
+      setRunning(true);
+      if (voiceOn) speak(`إعادة الخطوة ${idx + 1}: ${sObj.title}`);
+      const dur = Math.min(Math.max(savedDurs[id] ?? 1000, 400), 2500);
+      const start = Date.now();
+      await new Promise<void>((resolve) => {
+        const t = setInterval(() => {
+          const p = Math.min(100, ((Date.now() - start) / dur) * 100);
+          setProgress(p);
+          if (p >= 100) { clearInterval(t); resolve(); }
+        }, 50);
+      });
+      setRunning(false);
+      setCompleted((c) => [...c, id]);
+    }
+    setStepTimes(savedTimes);
+    setStepDurations(savedDurs);
+    setStepResults(savedResults);
+    setDone(true);
+    setReplayMode(false);
+    setLogs((l) => [...l, `[replay] ✓ انتهت إعادة المحاكاة`]);
   }
 
 
@@ -270,7 +377,31 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
               style={{ width: `${pct}%` }}
             />
           </div>
+
+          {/* Resume banner */}
+          {resumable && (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-toxic/50 bg-toxic/10 p-3 text-sm">
+              <div className="flex items-center gap-2 text-foreground/90">
+                <span className="text-lg">⏸</span>
+                <span>توجد جلسة محفوظة عند الخطوة <b>{resumable.currentStep + 1}</b> — {new Date(resumable.savedAt).toLocaleString("ar-EG")}</span>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={resumeSaved} className="rounded-full bg-toxic px-3 py-1 text-xs font-bold text-background">↩ استئناف من آخر خطوة</button>
+                <button onClick={dismissResume} className="rounded-full border border-border bg-background/60 px-3 py-1 text-xs">تجاهل</button>
+              </div>
+            </div>
+          )}
+
+          {/* Mentor sync chip */}
+          {!done && speakingNow && (
+            <div className="mt-3 flex items-center gap-2 rounded-full border border-primary/30 bg-primary/5 px-3 py-1.5 text-[11px] text-primary">
+              <span className="size-2 animate-pulse rounded-full bg-primary" />
+              <span className="font-bold tracking-widest">SYNC</span>
+              <span className="truncate text-foreground/80">🔊 الموجه: {speakingNow}</span>
+            </div>
+          )}
         </header>
+
 
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_1fr]">
@@ -436,6 +567,10 @@ function InstrumentRunner({ instrument, onBack }: { instrument: Instrument; onBa
               stepResults={stepResults}
               errors={errors}
               done={done}
+              mode={mode}
+              onReplay={startReplay}
+              canReplay={completed.length > 0 && !replayMode}
+              replaying={replayMode}
             />
 
             {/* Console log */}
@@ -915,6 +1050,10 @@ function LiveCaseReport({
   stepResults,
   errors,
   done,
+  mode,
+  onReplay,
+  canReplay,
+  replaying,
 }: {
   instrument: Instrument;
   patientId: string;
@@ -925,12 +1064,70 @@ function LiveCaseReport({
   stepResults: Record<string, "ok" | "err">;
   errors: { stepId: string; stepTitle: string; note: string; time: string }[];
   done: boolean;
+  mode: "training" | "exam";
+  onReplay: () => void;
+  canReplay: boolean;
+  replaying: boolean;
 }) {
   const total = instrument.steps.length;
   const doneCount = completed.length;
   const errCount = errors.length;
   const okCount = doneCount - errCount;
   const totalSec = Object.values(stepDurations).reduce((a, b) => a + b, 0) / 1000;
+
+  function exportPDF() {
+    const rows = instrument.steps.map((s, i) => {
+      const isDone = completed.includes(s.id);
+      const res = stepResults[s.id];
+      const dur = stepDurations[s.id];
+      const status = isDone ? (res === "err" ? "✕ خطأ" : "✓ صح") : "—";
+      const cls = res === "err" ? "err" : isDone ? "ok" : "muted";
+      return `<tr><td>${i + 1}</td><td>${escapeHtml(s.title)}</td><td class="${cls}">${status}</td><td>${dur != null ? (dur / 1000).toFixed(1) + "ث" : "—"}</td><td>${stepTimes[s.id] ?? "—"}</td></tr>`;
+    }).join("");
+
+    const errBlock = errCount
+      ? `<div class="box err-box"><b>⚠ الأخطاء المسجلة (${errCount}):</b><ul>${errors
+          .map((e) => `<li>[${e.time}] ${escapeHtml(e.stepTitle)} — ${escapeHtml(e.note)}</li>`)
+          .join("")}</ul></div>`
+      : `<div class="box ok-box">✓ لا توجد أخطاء — أداء مثالي.</div>`;
+
+    const html = `<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>تقرير الحالة ${patientId}</title>
+<style>
+  *{box-sizing:border-box} body{font-family:'Segoe UI',Tahoma,sans-serif;color:#111;padding:28px;background:#fff}
+  h1{margin:0 0 6px;font-size:22px} .sub{color:#555;font-size:12px;margin-bottom:14px}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}
+  .stat{border:1px solid #ddd;border-radius:8px;padding:8px;text-align:center}
+  .stat b{display:block;font-size:18px;margin-top:4px}
+  table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12px}
+  th,td{border:1px solid #ddd;padding:6px 8px;text-align:right}
+  th{background:#f4f4f4}
+  .ok{color:#0a7d2c;font-weight:bold} .err{color:#b00020;font-weight:bold} .muted{color:#888}
+  .box{border:1px solid #ddd;border-radius:8px;padding:10px;margin-top:12px;font-size:12px}
+  .err-box{border-color:#b00020;background:#fff4f4;color:#b00020}
+  .ok-box{border-color:#0a7d2c;background:#f3fbf5;color:#0a7d2c}
+  .diagnosis{border:2px solid #0a4d8a;background:#eef5ff;border-radius:10px;padding:12px;margin-top:14px}
+  @media print{body{padding:14px}}
+</style></head><body>
+<h1>تقرير الحالة المباشر — ${escapeHtml(instrument.name)}</h1>
+<div class="sub">رقم المريض: <b>${patientId}</b> · القسم: ${escapeHtml(instrument.branch)} · الوضع: ${mode === "training" ? "تدريب" : "امتحان"} · بدء الجلسة: ${startedAt.toLocaleString("ar-EG")} · طباعة: ${new Date().toLocaleString("ar-EG")}</div>
+<div class="grid">
+  <div class="stat">الخطوات<b>${doneCount}/${total}</b></div>
+  <div class="stat" style="color:#0a7d2c">صح<b>${okCount}</b></div>
+  <div class="stat" style="color:#b00020">خطأ<b>${errCount}</b></div>
+  <div class="stat">المدة الكلية<b>${totalSec.toFixed(1)}ث</b></div>
+</div>
+<table><thead><tr><th>#</th><th>الخطوة</th><th>النتيجة</th><th>المدة</th><th>الوقت</th></tr></thead><tbody>${rows}</tbody></table>
+${errBlock}
+${done ? `<div class="diagnosis"><b>🩺 التشخيص النهائي:</b> ${escapeHtml(instrument.finalResult)}</div>` : ""}
+<div class="sub" style="margin-top:24px">توقيع المشرف: د. ـــــــــــــــــــــــــ &nbsp;&nbsp; ختم المختبر 🧪</div>
+<script>window.onload=function(){setTimeout(function(){window.print();},350);};</script>
+</body></html>`;
+    const w = window.open("", "_blank", "noopener,noreferrer,width=900,height=1100");
+    if (!w) return;
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+  }
 
   return (
     <div className="rounded-2xl border border-primary/30 bg-card p-5">
@@ -941,6 +1138,25 @@ function LiveCaseReport({
           <span className="rounded-full bg-background/60 px-2 py-1">{startedAt.toLocaleTimeString("ar-EG")}</span>
         </div>
       </div>
+
+      <div className="mb-3 flex flex-wrap gap-2">
+        <button
+          onClick={exportPDF}
+          disabled={doneCount === 0}
+          className="rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-[11px] font-bold text-primary hover:bg-primary/20 disabled:opacity-40"
+        >
+          📄 تصدير PDF
+        </button>
+        <button
+          onClick={onReplay}
+          disabled={!canReplay}
+          className="rounded-full border border-toxic/40 bg-toxic/10 px-3 py-1.5 text-[11px] font-bold text-toxic hover:bg-toxic/20 disabled:opacity-40"
+        >
+          {replaying ? "⏵ يعيد المحاكاة…" : "🔁 إعادة المحاكاة"}
+        </button>
+      </div>
+
+
 
       <div className="grid grid-cols-4 gap-2 text-center text-[10px]">
         <div className="rounded-lg border border-border bg-background/40 p-2">
@@ -1012,4 +1228,13 @@ function LiveCaseReport({
       )}
     </div>
   );
+}
+
+function escapeHtml(s: string): string {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
