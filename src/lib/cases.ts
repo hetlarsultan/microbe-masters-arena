@@ -1,4 +1,4 @@
-export type Branch = "bacteriology" | "virology" | "mycology" | "parasitology" | "immunology";
+export type Branch = "bacteriology" | "virology" | "mycology" | "parasitology" | "immunology" | "hematology" | "biochemistry";
 
 export interface Test {
   id: string;
