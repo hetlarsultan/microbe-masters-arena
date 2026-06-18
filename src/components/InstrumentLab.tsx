@@ -963,6 +963,20 @@ function MedicalReport({
         <p className="mt-2 text-sm font-bold leading-relaxed text-foreground">{instrument.finalResult}</p>
       </div>
 
+      {/* Pathogen / finding visual */}
+      {(() => {
+        const v = getPathogenVisual(instrument.id);
+        return v ? (
+          <div className="mt-5">
+            <div className="mb-2 text-xs font-bold tracking-widest text-muted-foreground">
+              🖼️ صورة المسبب / النتيجة المخبرية
+            </div>
+            <PathogenScene v={v} />
+          </div>
+        ) : null;
+      })()}
+
+
       {/* Steps */}
       <div className="mt-5">
         <div className="mb-2 text-xs font-bold tracking-widest text-muted-foreground">📋 الخطوات المنفذة ({doneCount}/{totalSteps})</div>
