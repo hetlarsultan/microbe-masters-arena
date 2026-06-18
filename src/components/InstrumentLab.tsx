@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { INSTRUMENTS, INSTRUMENT_BRANCHES, type Instrument } from "@/lib/instruments";
 import { Lab3D } from "@/components/Lab3D";
 import { buildStepChoices, getPatientSample, type SampleCard } from "@/lib/manualActions";
+import { getPathogenVisual } from "@/lib/pathogenVisuals";
+import { PathogenScene } from "@/components/PathogenScene";
 
 
 type View = "list" | "run";
@@ -960,6 +962,20 @@ function MedicalReport({
         <div className="text-xs font-bold tracking-widest text-primary">🩺 التشخيص النهائي</div>
         <p className="mt-2 text-sm font-bold leading-relaxed text-foreground">{instrument.finalResult}</p>
       </div>
+
+      {/* Pathogen / finding visual */}
+      {(() => {
+        const v = getPathogenVisual(instrument.id);
+        return v ? (
+          <div className="mt-5">
+            <div className="mb-2 text-xs font-bold tracking-widest text-muted-foreground">
+              🖼️ صورة المسبب / النتيجة المخبرية
+            </div>
+            <PathogenScene v={v} />
+          </div>
+        ) : null;
+      })()}
+
 
       {/* Steps */}
       <div className="mt-5">
