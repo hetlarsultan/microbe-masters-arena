@@ -495,4 +495,6 @@ export const INSTRUMENT_BRANCHES: Record<string, { name: string; icon: string }>
   mycology: { name: "فطريات", icon: "🍄" },
   parasitology: { name: "طفيليات", icon: "🪱" },
   immunology: { name: "مناعة", icon: "🛡️" },
+  hematology: { name: "علم الدم", icon: "🩸" },
+  biochemistry: { name: "الكيمياء الحيوية", icon: "⚗️" },
 };
