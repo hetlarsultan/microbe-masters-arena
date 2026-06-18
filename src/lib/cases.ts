@@ -28,6 +28,8 @@ export const BRANCHES: Record<Branch, { name: string; icon: string; desc: string
   mycology:     { name: "علم الفطريات", icon: "🍄", desc: "تشخيص العدوى الفطرية", hue: 60 },
   parasitology: { name: "علم الطفيليات", icon: "🪱", desc: "تحديد الطفيليات في العينات", hue: 30 },
   immunology:   { name: "علم المناعة",  icon: "🛡️", desc: "اختبارات الأجسام المضادة والمناعة", hue: 220 },
+  hematology:   { name: "علم الدم",     icon: "🩸", desc: "تحليل خلايا الدم واضطرابات التخثر والأنيميا", hue: 0 },
+  biochemistry: { name: "الكيمياء الحيوية", icon: "⚗️", desc: "تحاليل الكبد والكلى والسكر والشوارد والإنزيمات", hue: 280 },
 };
 
 export const CASES: Case[] = [
