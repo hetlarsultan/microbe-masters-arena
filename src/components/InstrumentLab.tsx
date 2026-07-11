@@ -20,6 +20,10 @@ export function InstrumentLab({ onBack }: { onBack: () => void }) {
   );
   const active = INSTRUMENTS.find((i) => i.id === activeId) ?? null;
 
+  if (view === "pcr-pro") {
+    return <PCRLabPro onBack={() => setView("list")} />;
+  }
+
   if (view === "run" && active) {
     return (
       <InstrumentRunner
