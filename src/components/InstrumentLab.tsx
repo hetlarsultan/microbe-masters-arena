@@ -4,9 +4,10 @@ import { Lab3D } from "@/components/Lab3D";
 import { buildStepChoices, getPatientSample, type SampleCard } from "@/lib/manualActions";
 import { getPathogenVisual } from "@/lib/pathogenVisuals";
 import { PathogenScene } from "@/components/PathogenScene";
+import { PCRLabPro } from "@/components/PCRLabPro";
 
 
-type View = "list" | "run";
+type View = "list" | "run" | "pcr-pro";
 
 export function InstrumentLab({ onBack }: { onBack: () => void }) {
   const [view, setView] = useState<View>("list");
