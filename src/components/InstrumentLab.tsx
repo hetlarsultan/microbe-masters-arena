@@ -4,9 +4,10 @@ import { Lab3D } from "@/components/Lab3D";
 import { buildStepChoices, getPatientSample, type SampleCard } from "@/lib/manualActions";
 import { getPathogenVisual } from "@/lib/pathogenVisuals";
 import { PathogenScene } from "@/components/PathogenScene";
+import { PCRLabPro } from "@/components/PCRLabPro";
 
 
-type View = "list" | "run";
+type View = "list" | "run" | "pcr-pro";
 
 export function InstrumentLab({ onBack }: { onBack: () => void }) {
   const [view, setView] = useState<View>("list");
@@ -18,6 +19,10 @@ export function InstrumentLab({ onBack }: { onBack: () => void }) {
     [filter]
   );
   const active = INSTRUMENTS.find((i) => i.id === activeId) ?? null;
+
+  if (view === "pcr-pro") {
+    return <PCRLabPro onBack={() => setView("list")} />;
+  }
 
   if (view === "run" && active) {
     return (
@@ -80,32 +85,46 @@ export function InstrumentLab({ onBack }: { onBack: () => void }) {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {list.map((ins) => (
-            <button
-              key={ins.id}
-              onClick={() => {
-                setActiveId(ins.id);
-                setView("run");
-              }}
-              className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 text-right transition-all hover:-translate-y-1 hover:border-primary/60"
-            >
-              <div className="absolute -left-6 -top-6 size-24 rounded-full bg-primary/10 blur-2xl transition-opacity group-hover:opacity-100" />
-              <div className="relative">
-                <div className="flex items-center justify-between">
-                  <span className="text-5xl">{ins.icon}</span>
-                  <span className="rounded-full border border-border bg-background/40 px-2 py-1 text-[10px] tracking-widest text-muted-foreground">
-                    {INSTRUMENT_BRANCHES[ins.branch].icon} {INSTRUMENT_BRANCHES[ins.branch].name}
-                  </span>
-                </div>
-                <h3 className="mt-3 text-lg font-bold leading-tight">{ins.name}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{ins.tagline}</p>
-                <div className="mt-4 flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">{ins.steps.length} خطوات</span>
-                  <span className="font-bold text-primary">شغّل الجهاز ←</span>
+          {list.map((ins) => {
+            const isPCR = ins.id === "pcr";
+            return (
+              <div
+                key={ins.id}
+                className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 text-right transition-all hover:-translate-y-1 hover:border-primary/60"
+              >
+                <div className="absolute -left-6 -top-6 size-24 rounded-full bg-primary/10 blur-2xl" />
+                <div className="relative">
+                  <div className="flex items-center justify-between">
+                    <span className="text-5xl">{ins.icon}</span>
+                    <span className="rounded-full border border-border bg-background/40 px-2 py-1 text-[10px] tracking-widest text-muted-foreground">
+                      {INSTRUMENT_BRANCHES[ins.branch].icon} {INSTRUMENT_BRANCHES[ins.branch].name}
+                    </span>
+                  </div>
+                  <h3 className="mt-3 text-lg font-bold leading-tight">{ins.name}</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">{ins.tagline}</p>
+                  <div className="mt-4 flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">{ins.steps.length} خطوات</span>
+                  </div>
+                  <div className="mt-3 flex flex-col gap-2">
+                    <button
+                      onClick={() => { setActiveId(ins.id); setView("run"); }}
+                      className="w-full rounded-lg bg-primary/15 px-3 py-2 text-xs font-bold text-primary hover:bg-primary/25"
+                    >
+                      شغّل الجهاز ←
+                    </button>
+                    {isPCR && (
+                      <button
+                        onClick={() => setView("pcr-pro")}
+                        className="w-full rounded-lg bg-gradient-to-l from-primary to-accent px-3 py-2 text-xs font-black text-primary-foreground shadow-[var(--shadow-glow)] hover:opacity-90"
+                      >
+                        🧬 PCR Lab Simulator Pro — الوضع الاحترافي
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
-            </button>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
