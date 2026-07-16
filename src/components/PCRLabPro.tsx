@@ -131,6 +131,7 @@ export function PCRLabPro({ onBack }: { onBack: () => void }) {
   const [errors, setErrors] = useState<string[]>([]);
   const [score, setScore] = useState(100);
   const [log, setLog] = useState<{ t: number; msg: string; ok: boolean }[]>([]);
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
 
   const addLog = (msg: string, ok = true) =>
     setLog((l) => [...l, { t: Date.now(), msg, ok }]);
