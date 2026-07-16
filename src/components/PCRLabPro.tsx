@@ -124,6 +124,19 @@ const DISEASE_PATHOGEN: Record<string, PathogenVisual> = {
 
 /* ============================================================ */
 
+type PCRResult = "إيجابي" | "سلبي" | "حدّي" | "غير صالح" | "ملوث";
+interface AnalysisResult {
+  threshold: number;
+  baselineStart: number;
+  baselineEnd: number;
+  ct: number | null;
+  result: PCRResult;
+  warnings: string[];
+  contaminated: boolean;
+}
+
+
+
 
 export function PCRLabPro({ onBack }: { onBack: () => void }) {
   const [stage, setStage] = useState<Stage>("intro");
