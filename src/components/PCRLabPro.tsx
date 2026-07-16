@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { PathogenScene } from "@/components/PathogenScene";
+import type { PathogenVisual } from "@/lib/pathogenVisuals";
+
 
 /* ============================================================
    PCR Lab Simulator Pro — محاكاة معمل PCR احترافية
