@@ -956,17 +956,71 @@ function RunStage({ onDone, onLog }: { onDone: () => void; onLog: (m: string) =>
 /* ============================================================
    STAGE 9 — REAL-TIME ANALYZE (curves)
 ============================================================ */
-function AnalyzeStage({ patient, onDone }: { patient: Patient; onDone: () => void }) {
-  const ct = patient.expectedCt;
+function AnalyzeStage({
+  patient, errorsCount, onDone, onWarn,
+}: {
+  patient: Patient;
+  errorsCount: number;
+  onDone: (a: AnalysisResult) => void;
+  onWarn: (m: string) => void;
+}) {
+  const trueCt = patient.expectedCt;
+  const [threshold, setThreshold] = useState(0.15);
+  const [baselineStart, setBaselineStart] = useState(3);
+  const [baselineEnd, setBaselineEnd] = useState(15);
+  const [contaminate, setContaminate] = useState(false);
+  const warnedRef = useRef<Set<string>>(new Set());
+
   const points = useMemo(() => {
-    // sigmoid amplification if positive
-    if (ct === null) return Array.from({ length: 40 }, (_, i) => ({ x: i + 1, y: 0.02 + Math.random() * 0.01 }));
+    if (trueCt === null) return Array.from({ length: 40 }, (_, i) => ({ x: i + 1, y: 0.02 + Math.random() * 0.01 }));
     return Array.from({ length: 40 }, (_, i) => {
       const cycle = i + 1;
-      const y = 1 / (1 + Math.exp(-(cycle - ct) * 0.7));
-      return { x: cycle, y: y + Math.random() * 0.01 };
+      const y = 1 / (1 + Math.exp(-(cycle - trueCt) * 0.7));
+      return { x: cycle, y: y + Math.random() * 0.008 };
     });
-  }, [ct]);
+  }, [trueCt]);
+
+  // Detected Ct = first cycle where signal crosses threshold
+  const detectedCt = useMemo(() => {
+    for (const p of points) if (p.y >= threshold) return p.x;
+    return null;
+  }, [points, threshold]);
+
+  // ---- Interactive validation ----
+  const warnings: string[] = [];
+  if (threshold < 0.05) warnings.push("العتبة (Threshold) منخفضة جداً — ستُلتقط ضوضاء الخلفية كنتائج زائفة.");
+  if (threshold > 0.5) warnings.push("العتبة مرتفعة جداً — قد تُفوَّت العينات الإيجابية الضعيفة.");
+  if (baselineStart < 3) warnings.push("خط الاعتبار (Baseline Start) يجب ألا يقل عن الدورة 3.");
+  if (baselineEnd - baselineStart < 5) warnings.push("مدى الـ Baseline قصير جداً (< 5 دورات) — تصحيح الخط الأساسي غير موثوق.");
+  if (baselineEnd >= 20) warnings.push("Baseline End ≥ 20 قد يتداخل مع بداية منحنى التضخيف الحقيقي.");
+  if (trueCt !== null && baselineEnd >= trueCt - 2)
+    warnings.push(`Baseline End يقترب من Ct المتوقع (${trueCt}) — البروتوكول غير صالح، أعد الضبط.`);
+
+  // Log warnings once
+  useEffect(() => {
+    warnings.forEach((w) => {
+      if (!warnedRef.current.has(w)) {
+        warnedRef.current.add(w);
+        onWarn(w);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [warnings.join("|")]);
+
+  // ---- Result classification ----
+  const invalidProtocol =
+    threshold < 0.05 || threshold > 0.6 ||
+    baselineEnd - baselineStart < 5 ||
+    (trueCt !== null && baselineEnd >= trueCt - 2);
+
+  let result: PCRResult;
+  if (contaminate) result = "ملوث";
+  else if (invalidProtocol) result = "غير صالح";
+  else if (errorsCount >= 4) result = "ملوث";
+  else if (detectedCt === null) result = "سلبي";
+  else if (detectedCt > 38) result = "حدّي";
+  else if (detectedCt > 35) result = "حدّي";
+  else result = "إيجابي";
 
   const width = 520, height = 220, pad = 30;
   const path = points.map((p, i) => {
@@ -974,39 +1028,58 @@ function AnalyzeStage({ patient, onDone }: { patient: Patient; onDone: () => voi
     const py = height - pad - p.y * (height - pad * 2);
     return `${i === 0 ? "M" : "L"} ${px.toFixed(1)} ${py.toFixed(1)}`;
   }).join(" ");
-  const thresholdY = height - pad - 0.15 * (height - pad * 2);
-  const result = ct === null || ct > 40 ? "سلبي" : ct > 35 ? "حدّي" : "إيجابي";
+  const thresholdY = height - pad - Math.min(1, Math.max(0, threshold)) * (height - pad * 2);
+  const blStartX = pad + (baselineStart / 40) * (width - pad * 2);
+  const blEndX = pad + (baselineEnd / 40) * (width - pad * 2);
+
+  const canFinish = warnings.length === 0 || result === "غير صالح" || result === "ملوث";
+
+  const finish = () => {
+    onDone({
+      threshold, baselineStart, baselineEnd,
+      ct: detectedCt, result, warnings, contaminated: contaminate,
+    });
+  };
 
   return (
     <div>
-      <h2 className="text-xl font-bold">📈 تحليل منحنيات Real-Time</h2>
+      <h2 className="text-xl font-bold">📈 تحليل منحنيات Real-Time PCR</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        يمثّل المنحنى إشارة الفلورة (FAM) عبر الدورات. الخط الأحمر = threshold. Ct = نقطة التقاطع.
+        اضبط <b>Threshold</b> ومدى <b>Baseline</b> يدوياً. الجهاز يتحقق من صلاحية البروتوكول لحظياً.
       </p>
+
       <div className="mt-4 rounded-2xl border border-border bg-slate-950 p-4">
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full">
-          {/* grid */}
           {Array.from({ length: 5 }).map((_, i) => (
             <line key={i} x1={pad} x2={width - pad}
               y1={pad + i * ((height - pad * 2) / 4)} y2={pad + i * ((height - pad * 2) / 4)}
               stroke="#1f2937" strokeDasharray="2 3" />
           ))}
-          {/* axes */}
           <line x1={pad} y1={height - pad} x2={width - pad} y2={height - pad} stroke="#334155" />
           <line x1={pad} y1={pad} x2={pad} y2={height - pad} stroke="#334155" />
+          {/* baseline region */}
+          <rect x={blStartX} y={pad} width={Math.max(0, blEndX - blStartX)} height={height - pad * 2}
+            fill="#facc15" fillOpacity="0.08" stroke="#facc15" strokeOpacity="0.4" strokeDasharray="2 4" />
+          <text x={(blStartX + blEndX) / 2} y={pad + 12} textAnchor="middle" fill="#facc15" fontSize="10">
+            Baseline {baselineStart}–{baselineEnd}
+          </text>
           {/* threshold */}
           <line x1={pad} x2={width - pad} y1={thresholdY} y2={thresholdY} stroke="#ef4444" strokeDasharray="4 4" />
+          <text x={width - pad - 4} y={thresholdY - 4} textAnchor="end" fill="#ef4444" fontSize="10">
+            Threshold {threshold.toFixed(2)}
+          </text>
           {/* curve */}
           <path d={path} fill="none" stroke="#22d3ee" strokeWidth="2.5" />
-          {ct !== null && (
+          {detectedCt !== null && (
             <>
               <line
-                x1={pad + (ct / 40) * (width - pad * 2)} x2={pad + (ct / 40) * (width - pad * 2)}
+                x1={pad + (detectedCt / 40) * (width - pad * 2)}
+                x2={pad + (detectedCt / 40) * (width - pad * 2)}
                 y1={pad} y2={height - pad}
                 stroke="#a78bfa" strokeDasharray="3 3"
               />
-              <text x={pad + (ct / 40) * (width - pad * 2) + 4} y={pad + 12} fill="#a78bfa" fontSize="12">
-                Ct = {ct}
+              <text x={pad + (detectedCt / 40) * (width - pad * 2) + 4} y={pad + 24} fill="#a78bfa" fontSize="12">
+                Ct = {detectedCt}
               </text>
             </>
           )}
@@ -1014,17 +1087,85 @@ function AnalyzeStage({ patient, onDone }: { patient: Patient; onDone: () => voi
           <text x={pad + 4} y={pad + 12} fill="#64748b" fontSize="10">ΔRn</text>
         </svg>
       </div>
+
+      {/* Interactive controls */}
       <div className="mt-4 grid gap-3 md:grid-cols-3">
-        <Stat label="Ct" value={ct === null ? "—" : String(ct)} />
-        <Stat label="Threshold" value="0.15" />
-        <Stat label="النتيجة" value={result} highlight={result === "إيجابي" ? "positive" : result === "سلبي" ? "negative" : "warn"} />
+        <label className="rounded-xl border border-border bg-background/40 p-3">
+          <div className="text-xs text-muted-foreground">Threshold (ΔRn)</div>
+          <input
+            type="range" min={0.02} max={0.7} step={0.01}
+            value={threshold}
+            onChange={(e) => setThreshold(Number(e.target.value))}
+            className="mt-2 w-full accent-destructive"
+          />
+          <div className="mt-1 text-center font-mono text-sm">{threshold.toFixed(2)}</div>
+        </label>
+        <label className="rounded-xl border border-border bg-background/40 p-3">
+          <div className="text-xs text-muted-foreground">Baseline Start (دورة)</div>
+          <input
+            type="number" min={1} max={30} value={baselineStart}
+            onChange={(e) => setBaselineStart(Math.max(1, Number(e.target.value)))}
+            className="mt-2 w-full rounded-lg border border-border bg-card px-2 py-1 text-center font-mono"
+          />
+        </label>
+        <label className="rounded-xl border border-border bg-background/40 p-3">
+          <div className="text-xs text-muted-foreground">Baseline End (دورة)</div>
+          <input
+            type="number" min={5} max={35} value={baselineEnd}
+            onChange={(e) => setBaselineEnd(Math.max(5, Number(e.target.value)))}
+            className="mt-2 w-full rounded-lg border border-border bg-card px-2 py-1 text-center font-mono"
+          />
+        </label>
       </div>
-      <button onClick={onDone} className="mt-5 w-full rounded-xl bg-primary px-6 py-3 font-bold text-primary-foreground">
-        ✓ إصدار التقرير
+
+      {/* Live alerts */}
+      {warnings.length > 0 && (
+        <div className="mt-4 rounded-2xl border-2 border-destructive/60 bg-destructive/10 p-4">
+          <div className="mb-2 text-sm font-bold text-destructive">⚠ تنبيهات صلاحية البروتوكول</div>
+          <ul className="list-disc space-y-1 pr-5 text-sm text-destructive">
+            {warnings.map((w, i) => <li key={i}>{w}</li>)}
+          </ul>
+        </div>
+      )}
+      {warnings.length === 0 && (
+        <div className="mt-4 rounded-2xl border border-primary/40 bg-primary/10 p-3 text-sm text-primary">
+          ✓ إعدادات Real-Time PCR صالحة ومطابقة للبروتوكول.
+        </div>
+      )}
+
+      <div className="mt-4 flex items-center justify-between rounded-xl border border-border bg-background/40 p-3">
+        <label className="flex items-center gap-2 text-xs">
+          <input type="checkbox" checked={contaminate} onChange={(e) => setContaminate(e.target.checked)} />
+          محاكاة تلوث متبادل بين الأنابيب (Cross-contamination)
+        </label>
+        {contaminate && <span className="text-xs text-toxic">⚠ سيُعاد الفحص</span>}
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <Stat label="Ct المكتشف" value={detectedCt === null ? "—" : String(detectedCt)} />
+        <Stat label="Threshold" value={threshold.toFixed(2)} />
+        <Stat
+          label="النتيجة"
+          value={result}
+          highlight={
+            result === "إيجابي" ? "positive" :
+            result === "سلبي" ? "negative" :
+            "warn"
+          }
+        />
+      </div>
+
+      <button
+        onClick={finish}
+        className="mt-5 w-full rounded-xl bg-primary px-6 py-3 font-bold text-primary-foreground disabled:opacity-50"
+        disabled={!canFinish}
+      >
+        {canFinish ? "✓ إصدار التقرير" : "✎ صحّح الإعدادات أولاً"}
       </button>
     </div>
   );
 }
+
 function Stat({ label, value, highlight }: { label: string; value: string; highlight?: "positive"|"negative"|"warn" }) {
   const color = highlight === "positive" ? "text-destructive"
     : highlight === "negative" ? "text-primary"
