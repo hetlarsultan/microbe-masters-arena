@@ -252,8 +252,11 @@ export function PCRLabPro({ onBack }: { onBack: () => void }) {
             {stage === "analyze" && (
               <AnalyzeStage
                 patient={patient}
-                onDone={() => {
-                  addLog("تم حفظ النتائج");
+                errorsCount={errors.length}
+                onWarn={(m) => penalize(m, 5)}
+                onDone={(a) => {
+                  setAnalysis(a);
+                  addLog(`تم حفظ النتائج — ${a.result}`);
                   setStage("report");
                 }}
               />
@@ -264,6 +267,7 @@ export function PCRLabPro({ onBack }: { onBack: () => void }) {
                 errors={errors}
                 score={score}
                 log={log}
+                analysis={analysis}
                 onReset={reset}
               />
             )}
