@@ -1182,15 +1182,48 @@ function Stat({ label, value, highlight }: { label: string; value: string; highl
    STAGE 10 — REPORT
 ============================================================ */
 function ReportStage({
-  patient, errors, score, log, onReset,
+  patient, errors, score, log, analysis, onReset,
 }: {
   patient: Patient; errors: string[]; score: number;
-  log: { t: number; msg: string; ok: boolean }[]; onReset: () => void;
+  log: { t: number; msg: string; ok: boolean }[];
+  analysis: AnalysisResult | null;
+  onReset: () => void;
 }) {
-  const ct = patient.expectedCt;
-  const result = ct === null || ct > 40 ? "سلبي" : ct > 35 ? "حدّي" : "إيجابي";
+  const ct = analysis?.ct ?? patient.expectedCt;
+  const result: PCRResult =
+    analysis?.result ??
+    (patient.expectedCt === null || patient.expectedCt > 40 ? "سلبي"
+      : patient.expectedCt > 35 ? "حدّي" : "إيجابي");
   const grade = score >= 90 ? "A+" : score >= 80 ? "A" : score >= 70 ? "B" : score >= 60 ? "C" : "D";
   const rpt = `RPT-${Date.now().toString().slice(-6)}`;
+
+  const pathogen = DISEASE_PATHOGEN[patient.disease];
+  const showPathogenImage = pathogen && (result === "إيجابي" || result === "حدّي");
+
+  const resultDescription: Record<PCRResult, { color: string; text: string }> = {
+    "إيجابي": {
+      color: "border-destructive bg-destructive/10 text-destructive",
+      text: "تم الكشف عن تسلسل جيني مطابق للهدف. الحمل الفيروسي/الجرثومي مؤكّد.",
+    },
+    "سلبي": {
+      color: "border-primary bg-primary/10 text-primary",
+      text: "لم يُكتشف أي تضخيف فوق العتبة — العينة سلبية للهدف المُختبَر.",
+    },
+    "حدّي": {
+      color: "border-toxic bg-toxic/10 text-toxic",
+      text: "Ct مرتفع قرب حد الكشف — يُنصح بإعادة الفحص من عينة جديدة.",
+    },
+    "غير صالح": {
+      color: "border-toxic bg-toxic/10 text-toxic",
+      text: "إعدادات Threshold/Baseline غير صالحة أو البروتوكول غير مطابق — أعد التحليل.",
+    },
+    "ملوث": {
+      color: "border-destructive bg-destructive/10 text-destructive",
+      text: "اشتباه بتلوث متبادل بين الأنابيب أو ضوابط سلبية إيجابية — يجب تكرار الفحص.",
+    },
+  };
+  const rd = resultDescription[result];
+
   return (
     <div className="print:bg-white print:text-black">
       <h2 className="text-xl font-bold">📄 التقرير المخبري الرسمي</h2>
@@ -1212,17 +1245,51 @@ function ReportStage({
           <Field k="العمر / النوع" v={`${patient.age} / ${patient.gender}`} />
           <Field k="نوع العينة" v={patient.sample} />
           <Field k="الفحص المطلوب" v={patient.disease} />
-          <Field k="Ct Value" v={ct === null ? "—" : String(ct)} />
-          <Field k="Threshold" v="0.15" />
+          <Field k="Ct Value" v={ct === null || ct === undefined ? "—" : String(ct)} />
+          <Field k="Threshold" v={analysis ? analysis.threshold.toFixed(2) : "0.15"} />
+          <Field k="Baseline" v={analysis ? `${analysis.baselineStart}–${analysis.baselineEnd}` : "3–15"} />
+          <Field k="Target" v={patient.target} />
         </section>
 
-        <div className={`mt-5 rounded-xl border-2 p-4 text-center text-xl font-black ${
-          result === "إيجابي" ? "border-destructive bg-destructive/10 text-destructive"
-          : result === "سلبي" ? "border-primary bg-primary/10 text-primary"
-          : "border-toxic bg-toxic/10 text-toxic"
-        }`}>
-          النتيجة النهائية: {result}
+        <div className={`mt-5 rounded-xl border-2 p-4 text-center ${rd.color}`}>
+          <div className="text-xl font-black">النتيجة النهائية: {result}</div>
+          <div className="mt-2 text-xs opacity-90">{rd.text}</div>
         </div>
+
+        {showPathogenImage && pathogen && (
+          <section className="mt-5 rounded-2xl border border-border bg-slate-950/60 p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-xs font-bold text-muted-foreground">
+                🔬 صورة المُسبِّب المرضي المُكتشَف
+              </div>
+              <div className="text-[10px] text-muted-foreground">{pathogen.title}</div>
+            </div>
+            <div className="rounded-xl border border-border bg-black/40 p-3">
+              <PathogenScene v={pathogen} />
+            </div>
+            {pathogen.description && (
+              <p className="mt-2 text-xs text-muted-foreground">{pathogen.description}</p>
+            )}
+          </section>
+        )}
+
+        {(result === "غير صالح" || result === "ملوث") && (
+          <section className="mt-5 rounded-2xl border-2 border-toxic/50 bg-toxic/10 p-4 text-toxic">
+            <div className="text-xs font-bold">⚠ لم تُعرض صورة المُسبِّب</div>
+            <div className="mt-1 text-xs">
+              النتيجة غير موثوقة (إعدادات غير صالحة أو تلوث محتمل) — أعد الفحص قبل التفسير السريري.
+            </div>
+          </section>
+        )}
+
+        {analysis && analysis.warnings.length > 0 && (
+          <section className="mt-5">
+            <div className="text-xs font-bold text-muted-foreground">🧪 تنبيهات إعداد الجهاز</div>
+            <ul className="mt-2 list-disc space-y-1 pr-5 text-xs text-toxic">
+              {analysis.warnings.map((w, i) => <li key={i}>{w}</li>)}
+            </ul>
+          </section>
+        )}
 
         <section className="mt-5">
           <div className="text-xs font-bold text-muted-foreground">⚠ الأخطاء المخبرية المسجّلة</div>
@@ -1275,6 +1342,7 @@ function ReportStage({
     </div>
   );
 }
+
 function Field({ k, v }: { k: string; v: string }) {
   return (
     <div className="rounded-lg border border-border bg-background/40 px-3 py-2">
