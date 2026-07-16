@@ -146,6 +146,7 @@ export function PCRLabPro({ onBack }: { onBack: () => void }) {
     setErrors([]);
     setScore(100);
     setLog([]);
+    setAnalysis(null);
   };
 
   return (
