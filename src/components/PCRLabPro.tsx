@@ -1262,14 +1262,17 @@ function ReportStage({
               <div className="text-xs font-bold text-muted-foreground">
                 🔬 صورة المُسبِّب المرضي المُكتشَف
               </div>
-              <div className="text-[10px] text-muted-foreground">{pathogen.title}</div>
+              <div className="text-[10px] text-muted-foreground">
+                {pathogen.arabicName} — <i>{pathogen.scientificName}</i>
+              </div>
             </div>
             <div className="rounded-xl border border-border bg-black/40 p-3">
               <PathogenScene v={pathogen} />
             </div>
-            {pathogen.description && (
-              <p className="mt-2 text-xs text-muted-foreground">{pathogen.description}</p>
-            )}
+            <p className="mt-2 text-xs text-muted-foreground">
+              <b>الشكل:</b> {pathogen.morphology} — <b>تحت المجهر:</b> {pathogen.microscopy}
+            </p>
+
           </section>
         )}
 
