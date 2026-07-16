@@ -68,7 +68,62 @@ const REAGENTS: Reagent[] = [
   { id: "template", name: "Template (DNA/cDNA)", target: "العينة المستخلصة", correctVol: 2 },
 ];
 
+/* ---------- Pathogen visuals per patient disease ---------- */
+const DISEASE_PATHOGEN: Record<string, PathogenVisual> = {
+  "COVID-19": {
+    category: "virus", scientificName: "SARS-CoV-2", arabicName: "فيروس كورونا المستجد",
+    emoji: "🦠", morphology: "فيروس RNA مغلف بشوكات بروتين S",
+    microscopy: "منحنى تضخيف RT-PCR إيجابي — Ct ≈ 22", color: "fuchsia", scene: "virus-particles",
+  },
+  "HCV": {
+    category: "virus", scientificName: "Hepatitis C Virus", arabicName: "فيروس الكبد C",
+    emoji: "🧬", morphology: "فيروس RNA أحادي السلسلة",
+    microscopy: "حمل فيروسي مرتفع — منحنى تضخيف واضح", color: "amber", scene: "pcr-curve",
+  },
+  "HBV": {
+    category: "virus", scientificName: "Hepatitis B Virus", arabicName: "فيروس الكبد B",
+    emoji: "🟠", morphology: "فيروس DNA جزئي مزدوج",
+    microscopy: "HBV-DNA قابل للكشف عبر Real-Time PCR", color: "orange", scene: "virus-particles",
+  },
+  "Thalassemia (β-globin)": {
+    category: "genetic", scientificName: "HBB gene mutation", arabicName: "طفرة جين β-globin",
+    emoji: "🧬", morphology: "حذف/استبدال في جين HBB",
+    microscopy: "قراءة تسلسل تظهر الطفرة النقطية", color: "purple", scene: "sequence",
+  },
+  "Mycobacterium tuberculosis": {
+    category: "bacteria", scientificName: "Mycobacterium tuberculosis", arabicName: "عصية السل",
+    emoji: "🔴", morphology: "عصيات حامضية طويلة",
+    microscopy: "MTB-DNA مكتشف بواسطة GeneXpert", color: "red", scene: "acid-fast",
+  },
+  "Influenza A H1N1": {
+    category: "virus", scientificName: "Influenza A H1N1", arabicName: "إنفلونزا A H1N1",
+    emoji: "🦠", morphology: "فيروس RNA مجزّأ (8 قطع)",
+    microscopy: "تضخيف مقطع M إيجابي", color: "cyan", scene: "virus-particles",
+  },
+  "CMV (متابعة زرع)": {
+    category: "virus", scientificName: "Cytomegalovirus", arabicName: "الفيروس المضخم للخلايا",
+    emoji: "👁", morphology: "فيروس DNA من عائلة الهيربس",
+    microscopy: "قياس كمي — Log copies/mL", color: "violet", scene: "pcr-curve",
+  },
+  "Sickle Cell (HbS)": {
+    category: "genetic", scientificName: "HBB Glu6Val", arabicName: "طفرة الأنيميا المنجلية",
+    emoji: "🩸", morphology: "استبدال Glu → Val في جين HBB",
+    microscopy: "تسلسل يؤكد طفرة HbS", color: "rose", scene: "sequence",
+  },
+  "HIV (Viral Load)": {
+    category: "virus", scientificName: "HIV-1 RNA", arabicName: "فيروس نقص المناعة البشري",
+    emoji: "🧬", morphology: "فيروس RNA رجعي",
+    microscopy: "Viral Load بـ copies/mL", color: "teal", scene: "pcr-curve",
+  },
+  "Dengue": {
+    category: "virus", scientificName: "Dengue Virus", arabicName: "فيروس حمى الضنك",
+    emoji: "🦟", morphology: "Flavivirus RNA",
+    microscopy: "قد يكون سلبياً في الأيام المتأخرة", color: "lime", scene: "virus-particles",
+  },
+};
+
 /* ============================================================ */
+
 
 export function PCRLabPro({ onBack }: { onBack: () => void }) {
   const [stage, setStage] = useState<Stage>("intro");
