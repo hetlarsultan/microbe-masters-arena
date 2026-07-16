@@ -87,6 +87,7 @@ export function InstrumentLab({ onBack }: { onBack: () => void }) {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {list.map((ins) => {
             const isPCR = ins.id === "pcr";
+            const openPCRPro = () => setView("pcr-pro");
             return (
               <div
                 key={ins.id}
@@ -95,10 +96,33 @@ export function InstrumentLab({ onBack }: { onBack: () => void }) {
                 <div className="absolute -left-6 -top-6 size-24 rounded-full bg-primary/10 blur-2xl" />
                 <div className="relative">
                   <div className="flex items-center justify-between">
-                    <span className="text-5xl">{ins.icon}</span>
-                    <span className="rounded-full border border-border bg-background/40 px-2 py-1 text-[10px] tracking-widest text-muted-foreground">
-                      {INSTRUMENT_BRANCHES[ins.branch].icon} {INSTRUMENT_BRANCHES[ins.branch].name}
-                    </span>
+                    {isPCR ? (
+                      <button
+                        onClick={openPCRPro}
+                        aria-label="فتح PCR Lab Simulator Pro"
+                        title="اضغط لفتح PCR Lab Simulator Pro"
+                        className="relative text-5xl transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary rounded-full"
+                      >
+                        {ins.icon}
+                        <span className="absolute -bottom-1 -left-1 rounded-full bg-gradient-to-l from-primary to-accent px-1.5 py-0.5 text-[8px] font-black text-primary-foreground shadow-[var(--shadow-glow)]">
+                          PRO
+                        </span>
+                      </button>
+                    ) : (
+                      <span className="text-5xl">{ins.icon}</span>
+                    )}
+                    {isPCR ? (
+                      <button
+                        onClick={openPCRPro}
+                        className="rounded-full border border-primary/50 bg-primary/15 px-2 py-1 text-[10px] font-bold tracking-widest text-primary hover:bg-primary/25"
+                      >
+                        {INSTRUMENT_BRANCHES[ins.branch].icon} {INSTRUMENT_BRANCHES[ins.branch].name} • PRO
+                      </button>
+                    ) : (
+                      <span className="rounded-full border border-border bg-background/40 px-2 py-1 text-[10px] tracking-widest text-muted-foreground">
+                        {INSTRUMENT_BRANCHES[ins.branch].icon} {INSTRUMENT_BRANCHES[ins.branch].name}
+                      </span>
+                    )}
                   </div>
                   <h3 className="mt-3 text-lg font-bold leading-tight">{ins.name}</h3>
                   <p className="mt-2 text-sm text-muted-foreground">{ins.tagline}</p>
@@ -106,18 +130,27 @@ export function InstrumentLab({ onBack }: { onBack: () => void }) {
                     <span className="text-muted-foreground">{ins.steps.length} خطوات</span>
                   </div>
                   <div className="mt-3 flex flex-col gap-2">
-                    <button
-                      onClick={() => { setActiveId(ins.id); setView("run"); }}
-                      className="w-full rounded-lg bg-primary/15 px-3 py-2 text-xs font-bold text-primary hover:bg-primary/25"
-                    >
-                      شغّل الجهاز ←
-                    </button>
-                    {isPCR && (
+                    {isPCR ? (
+                      <>
+                        <button
+                          onClick={openPCRPro}
+                          className="w-full rounded-lg bg-gradient-to-l from-primary to-accent px-3 py-2 text-xs font-black text-primary-foreground shadow-[var(--shadow-glow)] hover:opacity-90"
+                        >
+                          🧬 PCR Lab Simulator Pro — الوضع الاحترافي
+                        </button>
+                        <button
+                          onClick={() => { setActiveId(ins.id); setView("run"); }}
+                          className="w-full rounded-lg bg-primary/10 px-3 py-2 text-[11px] font-semibold text-primary hover:bg-primary/20"
+                        >
+                          الوضع البسيط ←
+                        </button>
+                      </>
+                    ) : (
                       <button
-                        onClick={() => setView("pcr-pro")}
-                        className="w-full rounded-lg bg-gradient-to-l from-primary to-accent px-3 py-2 text-xs font-black text-primary-foreground shadow-[var(--shadow-glow)] hover:opacity-90"
+                        onClick={() => { setActiveId(ins.id); setView("run"); }}
+                        className="w-full rounded-lg bg-primary/15 px-3 py-2 text-xs font-bold text-primary hover:bg-primary/25"
                       >
-                        🧬 PCR Lab Simulator Pro — الوضع الاحترافي
+                        شغّل الجهاز ←
                       </button>
                     )}
                   </div>
