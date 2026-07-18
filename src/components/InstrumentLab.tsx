@@ -13,6 +13,7 @@ export function InstrumentLab({ onBack }: { onBack: () => void }) {
   const [view, setView] = useState<View>("list");
   const [filter, setFilter] = useState<string>("all");
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [showProConfirm, setShowProConfirm] = useState(false);
 
   const list = useMemo(
     () => (filter === "all" ? INSTRUMENTS : INSTRUMENTS.filter((i) => i.branch === filter)),
@@ -23,6 +24,7 @@ export function InstrumentLab({ onBack }: { onBack: () => void }) {
   if (view === "pcr-pro") {
     return <PCRLabPro onBack={() => setView("list")} />;
   }
+
 
   if (view === "run" && active) {
     return (
@@ -87,12 +89,27 @@ export function InstrumentLab({ onBack }: { onBack: () => void }) {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {list.map((ins) => {
             const isPCR = ins.id === "pcr";
-            const openPCRPro = () => setView("pcr-pro");
+            const openPCRPro = () => setShowProConfirm(true);
             return (
               <div
                 key={ins.id}
-                className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 text-right transition-all hover:-translate-y-1 hover:border-primary/60"
+                className={`group relative overflow-hidden rounded-2xl border p-5 text-right transition-all hover:-translate-y-1 ${
+                  isPCR
+                    ? "border-primary/60 bg-gradient-to-br from-card via-card to-primary/10 shadow-[var(--shadow-glow)] hover:border-primary"
+                    : "border-border bg-card hover:border-primary/60"
+                }`}
               >
+                {isPCR && (
+                  <>
+                    <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-primary/30" />
+                    <div className="absolute -right-10 -top-10 size-32 rounded-full bg-accent/20 blur-3xl" />
+                    {/* Distinctive PRO ribbon above the icon */}
+                    <div className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-full border border-primary/70 bg-gradient-to-l from-primary via-accent to-primary bg-[length:200%_100%] px-2.5 py-1 text-[10px] font-black tracking-widest text-primary-foreground shadow-[var(--shadow-toxic)] animate-pulse">
+                      <span>⭐</span>
+                      <span>PRO MODE</span>
+                    </div>
+                  </>
+                )}
                 <div className="absolute -left-6 -top-6 size-24 rounded-full bg-primary/10 blur-2xl" />
                 <div className="relative">
                   <div className="flex items-center justify-between">
@@ -103,7 +120,7 @@ export function InstrumentLab({ onBack }: { onBack: () => void }) {
                         title="اضغط لفتح PCR Lab Simulator Pro"
                         className="relative text-5xl transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary rounded-full"
                       >
-                        {ins.icon}
+                        <span className="drop-shadow-[0_0_12px_oklch(0.78_0.18_165/0.6)]">{ins.icon}</span>
                         <span className="absolute -bottom-1 -left-1 rounded-full bg-gradient-to-l from-primary to-accent px-1.5 py-0.5 text-[8px] font-black text-primary-foreground shadow-[var(--shadow-glow)]">
                           PRO
                         </span>
@@ -111,14 +128,7 @@ export function InstrumentLab({ onBack }: { onBack: () => void }) {
                     ) : (
                       <span className="text-5xl">{ins.icon}</span>
                     )}
-                    {isPCR ? (
-                      <button
-                        onClick={openPCRPro}
-                        className="rounded-full border border-primary/50 bg-primary/15 px-2 py-1 text-[10px] font-bold tracking-widest text-primary hover:bg-primary/25"
-                      >
-                        {INSTRUMENT_BRANCHES[ins.branch].icon} {INSTRUMENT_BRANCHES[ins.branch].name} • PRO
-                      </button>
-                    ) : (
+                    {!isPCR && (
                       <span className="rounded-full border border-border bg-background/40 px-2 py-1 text-[10px] tracking-widest text-muted-foreground">
                         {INSTRUMENT_BRANCHES[ins.branch].icon} {INSTRUMENT_BRANCHES[ins.branch].name}
                       </span>
@@ -160,9 +170,94 @@ export function InstrumentLab({ onBack }: { onBack: () => void }) {
           })}
         </div>
       </div>
+
+      {showProConfirm && (
+        <ProConfirmModal
+          onCancel={() => setShowProConfirm(false)}
+          onConfirm={() => { setShowProConfirm(false); setView("pcr-pro"); }}
+        />
+      )}
     </div>
   );
 }
+
+function ProConfirmModal({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void }) {
+  const features = [
+    { icon: "🧪", title: "10 مراحل واقعية", desc: "من استقبال العينة حتى التقرير النهائي" },
+    { icon: "🧬", title: "استخراج DNA/RNA", desc: "بروتوكول كامل مع تحقق NanoDrop" },
+    { icon: "🌡️", title: "برمجة Thermocycler", desc: "دورات حرارية دقيقة كالجهاز الحقيقي" },
+    { icon: "📈", title: "منحنيات Real-Time", desc: "تحليل Ct مع threshold تفاعلي" },
+    { icon: "🦠", title: "صور المسبب المرضي", desc: "عرض بصري للنتيجة داخل التقرير" },
+    { icon: "📄", title: "تقرير طبي احترافي", desc: "قابل للطباعة مع سجل الأخطاء" },
+  ];
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
+      onClick={onCancel}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-primary/50 bg-card shadow-[var(--shadow-toxic)]"
+      >
+        <div className="absolute -right-16 -top-16 size-40 rounded-full bg-accent/20 blur-3xl" />
+        <div className="absolute -left-16 -bottom-16 size-40 rounded-full bg-primary/20 blur-3xl" />
+        <div className="relative p-6">
+          <div className="flex items-center gap-3">
+            <div className="flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent text-3xl shadow-[var(--shadow-glow)]">
+              🧬
+            </div>
+            <div>
+              <div className="text-[10px] font-black tracking-widest text-primary">PCR LAB SIMULATOR</div>
+              <h2 className="text-2xl font-black">
+                <span className="bg-gradient-to-l from-primary to-accent bg-clip-text text-transparent">
+                  الوضع الاحترافي Pro
+                </span>
+              </h2>
+            </div>
+          </div>
+          <p className="mt-3 text-sm text-muted-foreground">
+            أنت على وشك بدء محاكاة معملية متقدمة تحاكي مختبر PCR حقيقي بجميع خطواته وأجهزته.
+            تأكد من استعدادك للمتابعة.
+          </p>
+
+          <div className="mt-5 grid gap-2 sm:grid-cols-2">
+            {features.map((f) => (
+              <div key={f.title} className="rounded-xl border border-border bg-background/40 p-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">{f.icon}</span>
+                  <span className="text-xs font-bold">{f.title}</span>
+                </div>
+                <p className="mt-1 text-[11px] text-muted-foreground">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 rounded-xl border border-primary/30 bg-primary/5 p-3 text-[11px] text-muted-foreground">
+            💡 نصيحة: فعّل الصوت لسماع تعليمات الموجه، والتزم بالبروتوكول لتجنّب الأخطاء.
+          </div>
+
+          <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button
+              onClick={onCancel}
+              className="rounded-xl border border-border bg-background/60 px-5 py-2.5 text-sm font-semibold text-muted-foreground hover:text-foreground"
+            >
+              إلغاء
+            </button>
+            <button
+              onClick={onConfirm}
+              className="rounded-xl bg-gradient-to-l from-primary to-accent px-6 py-2.5 text-sm font-black text-primary-foreground shadow-[var(--shadow-glow)] hover:opacity-90"
+            >
+              🚀 متابعة إلى Pro Mode
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 /* ============================ RUNNER ============================ */
 
