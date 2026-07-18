@@ -13,6 +13,7 @@ export function InstrumentLab({ onBack }: { onBack: () => void }) {
   const [view, setView] = useState<View>("list");
   const [filter, setFilter] = useState<string>("all");
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [showProConfirm, setShowProConfirm] = useState(false);
 
   const list = useMemo(
     () => (filter === "all" ? INSTRUMENTS : INSTRUMENTS.filter((i) => i.branch === filter)),
@@ -23,6 +24,7 @@ export function InstrumentLab({ onBack }: { onBack: () => void }) {
   if (view === "pcr-pro") {
     return <PCRLabPro onBack={() => setView("list")} />;
   }
+
 
   if (view === "run" && active) {
     return (
