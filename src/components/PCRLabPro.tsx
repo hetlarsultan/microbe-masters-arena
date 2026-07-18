@@ -10,16 +10,19 @@ import type { PathogenVisual } from "@/lib/pathogenVisuals";
    ============================================================ */
 
 type Stage =
+  | "calibration"
   | "intro"
   | "biosafety"
   | "verify"
   | "extract"
   | "quant"
   | "mastermix"
+  | "contam"
   | "program"
   | "run"
   | "analyze"
   | "report";
+
 
 interface Patient {
   id: string;
@@ -139,12 +142,14 @@ interface AnalysisResult {
 
 
 export function PCRLabPro({ onBack }: { onBack: () => void }) {
-  const [stage, setStage] = useState<Stage>("intro");
+  const [stage, setStage] = useState<Stage>("calibration");
   const [patient, setPatient] = useState<Patient>(PATIENTS[0]);
   const [errors, setErrors] = useState<string[]>([]);
   const [score, setScore] = useState(100);
   const [log, setLog] = useState<{ t: number; msg: string; ok: boolean }[]>([]);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [forcedContam, setForcedContam] = useState(false);
+  const [calibrationOk, setCalibrationOk] = useState(false);
 
   const addLog = (msg: string, ok = true) =>
     setLog((l) => [...l, { t: Date.now(), msg, ok }]);
@@ -155,12 +160,15 @@ export function PCRLabPro({ onBack }: { onBack: () => void }) {
   };
 
   const reset = () => {
-    setStage("intro");
+    setStage("calibration");
     setErrors([]);
     setScore(100);
     setLog([]);
     setAnalysis(null);
+    setForcedContam(false);
+    setCalibrationOk(false);
   };
+
 
   return (
     <div dir="rtl" className="min-h-screen px-4 py-6 md:px-8">
@@ -183,11 +191,26 @@ export function PCRLabPro({ onBack }: { onBack: () => void }) {
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
           <main className="rounded-3xl border border-border bg-card p-5 md:p-7">
+            {stage === "calibration" && (
+              <CalibrationStage
+                onLog={(m, ok) => addLog(m, ok)}
+                onWarn={(m) => penalize(m, 5)}
+                onDone={() => {
+                  setCalibrationOk(true);
+                  addLog("✅ الجهاز مُعاير وصالح للاستخدام");
+                  setStage("intro");
+                }}
+              />
+            )}
             {stage === "intro" && (
               <IntroStage
                 patient={patient}
                 setPatient={setPatient}
                 onStart={() => {
+                  if (!calibrationOk) {
+                    penalize("محاولة بدء البروتوكول قبل اكتمال المعايرة", 15);
+                    return;
+                  }
                   addLog(`تم استلام العينة ${patient.id}`);
                   setStage("biosafety");
                 }}
@@ -233,6 +256,16 @@ export function PCRLabPro({ onBack }: { onBack: () => void }) {
               <MasterMixStage
                 onError={(m) => penalize(m, 8)}
                 onLog={(m) => addLog(m)}
+                onDone={() => setStage("contam")}
+              />
+            )}
+            {stage === "contam" && (
+              <ContaminationStage
+                onLog={(m, ok) => addLog(m, ok)}
+                onContaminated={(reason) => {
+                  setForcedContam(true);
+                  penalize(`تلوث متقاطع: ${reason}`, 20);
+                }}
                 onDone={() => setStage("program")}
               />
             )}
@@ -253,6 +286,7 @@ export function PCRLabPro({ onBack }: { onBack: () => void }) {
               <AnalyzeStage
                 patient={patient}
                 errorsCount={errors.length}
+                forcedContam={forcedContam}
                 onWarn={(m) => penalize(m, 5)}
                 onDone={(a) => {
                   setAnalysis(a);
@@ -261,6 +295,7 @@ export function PCRLabPro({ onBack }: { onBack: () => void }) {
                 }}
               />
             )}
+
             {stage === "report" && (
               <ReportStage
                 patient={patient}
@@ -316,23 +351,26 @@ function Header({ stage }: { stage: Stage }) {
 }
 
 const STAGE_LABEL: Record<Stage, string> = {
+  calibration: "معايرة الجهاز",
   intro: "استقبال العينة",
   biosafety: "السلامة الحيوية",
   verify: "التحقق من العينة",
   extract: "الاستخلاص",
   quant: "قياس التركيز",
   mastermix: "تحضير Master Mix",
+  contam: "اختبار التلوث المتقاطع",
   program: "برمجة الجهاز",
   run: "تشغيل PCR",
   analyze: "تحليل Real-Time",
   report: "التقرير النهائي",
 };
 
+
 /* ============================================================
    STAGE MAP (sidebar)
 ============================================================ */
 function StageMap({ stage }: { stage: Stage }) {
-  const order: Stage[] = ["intro", "biosafety", "verify", "extract", "quant", "mastermix", "program", "run", "analyze", "report"];
+  const order: Stage[] = ["calibration", "intro", "biosafety", "verify", "extract", "quant", "mastermix", "contam", "program", "run", "analyze", "report"];
   const currentIdx = order.indexOf(stage);
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
@@ -366,17 +404,20 @@ function StageMap({ stage }: { stage: Stage }) {
    PROFESSOR PANEL (Arabic TTS)
 ============================================================ */
 const PROFESSOR: Record<Stage, string> = {
+  calibration: "قبل أي بروتوكول، عايِر جهاز Real-Time PCR: كفاءة التفاعل يجب أن تكون بين 90٪ و110٪، ومعامل R² لا يقل عن 0.98، والميل بين -3.6 و-3.1.",
   intro: "أهلاً بك أيها الزميل. اختر ملف المريض من قائمة الاستقبال ثم ابدأ بارتداء معدات الحماية.",
   biosafety: "ارتدِ القفازات والمعطف وقناع N95 والنظارات، وعقّم السطح بالكحول 70٪. لا تُدخل الهاتف أو الطعام إلى المنطقة.",
   verify: "قبل أي فحص، تأكد أن اسم المريض وعمره ونوع العينة مطابقة تماماً لطلب الفحص.",
   extract: "استخدم كولونة السيليكا: تحلل → غسيل × 2 → إلوشن. لا تخلط قمم أنابيب الغسيل والإلوشن أبداً.",
   quant: "ضع 1 ميكرولتر على NanoDrop. تأكد أن نسبة A260/280 بين 1.8 و2.0.",
   mastermix: "حضّر الخليط في غرفة PCR النظيفة، ثم أضف القالب في غرفة منفصلة لتفادي التلوث المتبادل.",
+  contam: "سيناريو تلوث متقاطع: اتخذ القرارات الصحيحة لعزل العينات. أي خطأ سيُفعّل تنبيه Contaminated تلقائياً في التقرير.",
   program: "تأكد من درجات الحرارة: تمسّخ 95°م، تلدين 60°م، استطالة 72°م، و40 دورة لـ Real-Time.",
   run: "أغلق الغطاء بإحكام. راقب منحنى الحرارة والدورات ولا توقف التشغيل إلا للطوارئ.",
   analyze: "قيمة Ct أقل من 35 تعتبر إيجابية، بين 35–40 حدية، وأكبر من 40 أو غياب المنحنى = سلبية.",
   report: "راجع التقرير قبل توقيعه. تحقق من رقم المريض والتشخيص والتاريخ.",
 };
+
 
 function ProfessorPanel({ stage }: { stage: Stage }) {
   const [muted, setMuted] = useState(false);
@@ -957,10 +998,11 @@ function RunStage({ onDone, onLog }: { onDone: () => void; onLog: (m: string) =>
    STAGE 9 — REAL-TIME ANALYZE (curves)
 ============================================================ */
 function AnalyzeStage({
-  patient, errorsCount, onDone, onWarn,
+  patient, errorsCount, forcedContam = false, onDone, onWarn,
 }: {
   patient: Patient;
   errorsCount: number;
+  forcedContam?: boolean;
   onDone: (a: AnalysisResult) => void;
   onWarn: (m: string) => void;
 }) {
@@ -968,8 +1010,10 @@ function AnalyzeStage({
   const [threshold, setThreshold] = useState(0.15);
   const [baselineStart, setBaselineStart] = useState(3);
   const [baselineEnd, setBaselineEnd] = useState(15);
-  const [contaminate, setContaminate] = useState(false);
+  const [contaminate, setContaminate] = useState(forcedContam);
   const warnedRef = useRef<Set<string>>(new Set());
+  useEffect(() => { if (forcedContam) setContaminate(true); }, [forcedContam]);
+
 
   const points = useMemo(() => {
     if (trueCt === null) return Array.from({ length: 40 }, (_, i) => ({ x: i + 1, y: 0.02 + Math.random() * 0.01 }));
@@ -1351,6 +1395,246 @@ function Field({ k, v }: { k: string; v: string }) {
     <div className="rounded-lg border border-border bg-background/40 px-3 py-2">
       <div className="text-[10px] uppercase tracking-widest text-muted-foreground">{k}</div>
       <div className="mt-0.5 font-bold">{v}</div>
+    </div>
+  );
+}
+
+/* ============================================================
+   STAGE 0 — CALIBRATION (Real-Time PCR validity check)
+============================================================ */
+function CalibrationStage({
+  onDone, onLog, onWarn,
+}: {
+  onDone: () => void;
+  onLog: (m: string, ok?: boolean) => void;
+  onWarn: (m: string) => void;
+}) {
+  const [running, setRunning] = useState(false);
+  const [done, setDone] = useState(false);
+  const [attempts, setAttempts] = useState(0);
+  const [metrics, setMetrics] = useState<{ efficiency: number; r2: number; slope: number } | null>(null);
+
+  const runCalibration = () => {
+    setRunning(true);
+    setDone(false);
+    setMetrics(null);
+    onLog("بدء دورة معايرة على منحنى قياسي (10-fold serial dilution × 5 نقاط)");
+    setTimeout(() => {
+      // Random-ish values around ideal; occasionally out-of-spec
+      const efficiency = +(88 + Math.random() * 24).toFixed(1); // 88 - 112
+      const r2 = +(0.965 + Math.random() * 0.033).toFixed(3);
+      const slope = +(-3.7 + Math.random() * 0.75).toFixed(2);
+      setMetrics({ efficiency, r2, slope });
+      setRunning(false);
+      setDone(true);
+      onLog(`نتائج المعايرة — Efficiency ${efficiency}٪ | R²=${r2} | Slope=${slope}`);
+    }, 1600);
+  };
+
+  const validEff = metrics ? metrics.efficiency >= 90 && metrics.efficiency <= 110 : false;
+  const validR2 = metrics ? metrics.r2 >= 0.98 : false;
+  const validSlope = metrics ? metrics.slope >= -3.6 && metrics.slope <= -3.1 : false;
+  const allValid = validEff && validR2 && validSlope;
+
+  const accept = () => {
+    if (!metrics) return;
+    if (!allValid) {
+      const issues: string[] = [];
+      if (!validEff) issues.push(`الكفاءة ${metrics.efficiency}٪ خارج النطاق (90-110٪)`);
+      if (!validR2) issues.push(`R²=${metrics.r2} أقل من 0.98`);
+      if (!validSlope) issues.push(`Slope=${metrics.slope} خارج النطاق (-3.6 إلى -3.1)`);
+      issues.forEach(onWarn);
+      setAttempts((a) => a + 1);
+      return;
+    }
+    onDone();
+  };
+
+  return (
+    <div>
+      <h2 className="text-xl font-bold">🛠 معايرة جهاز Real-Time PCR</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        تحقّق من صلاحية الجهاز قبل بدء البروتوكول. لا يُسمح بالمتابعة إلا إذا كانت المؤشرات ضمن النطاق المقبول.
+      </p>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-3">
+        <Metric label="كفاءة التفاعل" ideal="90 – 110 ٪" value={metrics ? `${metrics.efficiency} ٪` : "—"} ok={validEff} shown={!!metrics} />
+        <Metric label="R² (خطية المنحنى)" ideal="≥ 0.98" value={metrics ? metrics.r2.toFixed(3) : "—"} ok={validR2} shown={!!metrics} />
+        <Metric label="Slope" ideal="-3.6 إلى -3.1" value={metrics ? metrics.slope.toFixed(2) : "—"} ok={validSlope} shown={!!metrics} />
+      </div>
+
+      <div className="mt-5 rounded-xl border border-border bg-background/40 p-4 text-xs text-muted-foreground">
+        📊 يتم استخدام سلسلة تخفيفات معيارية (10¹ → 10⁵ نسخة) لحساب كفاءة التضخيف ودقة الجهاز.
+        <div className="mt-2">محاولات المعايرة: <b className="text-foreground">{attempts}</b></div>
+      </div>
+
+      {done && !allValid && (
+        <div className="mt-4 rounded-xl border border-destructive/60 bg-destructive/15 p-3 text-sm text-destructive">
+          ⚠ الجهاز غير صالح للاستخدام. أعد المعايرة قبل بدء البروتوكول.
+        </div>
+      )}
+      {done && allValid && (
+        <div className="mt-4 rounded-xl border border-success/60 bg-success/15 p-3 text-sm text-success">
+          ✅ الجهاز اجتاز جميع فحوصات المعايرة — يمكنك المتابعة.
+        </div>
+      )}
+
+      <div className="mt-5 flex flex-wrap gap-2">
+        <button
+          onClick={runCalibration}
+          disabled={running}
+          className="rounded-xl bg-primary/15 px-4 py-2 text-sm font-bold text-primary hover:bg-primary/25 disabled:opacity-50"
+        >
+          {running ? "⏳ جاري المعايرة..." : done ? "🔄 إعادة المعايرة" : "▶ تشغيل المعايرة"}
+        </button>
+        <button
+          onClick={accept}
+          disabled={!done || !allValid}
+          className="rounded-xl bg-gradient-to-l from-primary to-accent px-4 py-2 text-sm font-black text-primary-foreground shadow-[var(--shadow-glow)] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          ✅ اعتماد المعايرة والمتابعة
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Metric({ label, ideal, value, ok, shown }: { label: string; ideal: string; value: string; ok: boolean; shown: boolean }) {
+  const color = !shown ? "border-border bg-background/30 text-muted-foreground" : ok ? "border-success/50 bg-success/10 text-success" : "border-destructive/50 bg-destructive/10 text-destructive";
+  return (
+    <div className={`rounded-xl border p-3 text-center ${color}`}>
+      <div className="text-[10px] tracking-widest opacity-70">{label}</div>
+      <div className="mt-1 text-2xl font-black">{value}</div>
+      <div className="mt-1 text-[10px] opacity-70">النطاق المقبول: {ideal}</div>
+      {shown && <div className="mt-1 text-xs font-bold">{ok ? "✓ ضمن النطاق" : "✗ خارج النطاق"}</div>}
+    </div>
+  );
+}
+
+/* ============================================================
+   STAGE — CROSS-CONTAMINATION SCENARIO
+============================================================ */
+type ContamChoice = { id: string; label: string; safe: boolean; reason: string };
+
+function ContaminationStage({
+  onDone, onLog, onContaminated,
+}: {
+  onDone: () => void;
+  onLog: (m: string, ok?: boolean) => void;
+  onContaminated: (reason: string) => void;
+}) {
+  const scenarios: { q: string; choices: ContamChoice[] }[] = [
+    {
+      q: "اكتشفت قطرة من عينة المريض السابق على السطح — ماذا تفعل؟",
+      choices: [
+        { id: "a", label: "امسح فوراً بكحول 70٪ ثم DNAZap وسجّل الحادثة", safe: true, reason: "تعقيم صحيح + توثيق" },
+        { id: "b", label: "تجاهل القطرة وتابع العمل", safe: false, reason: "ترك قطرة قد يُلوّث Master Mix" },
+        { id: "c", label: "امسح بمنديل جاف فقط", safe: false, reason: "المسح الجاف يوزّع الحمض النووي" },
+      ],
+    },
+    {
+      q: "أثناء إضافة القالب، سقطت قطرة من ماصّة عينة إيجابية داخل رف الأنابيب. ماذا تختار؟",
+      choices: [
+        { id: "a", label: "استبدل الرف كاملاً وأعد إعداد الأنابيب المتأثرة", safe: true, reason: "منع أي نقل عرضي" },
+        { id: "b", label: "امسح الرف وتابع بنفس الأنابيب", safe: false, reason: "المسح لا يزيل الحمض النووي كاملاً" },
+        { id: "c", label: "أكمل الإضافة سريعاً قبل التبخر", safe: false, reason: "استمرار العمل يُلوّث كل الأنابيب" },
+      ],
+    },
+    {
+      q: "قمت بفتح أنابيب Post-PCR في نفس غرفة تحضير Master Mix. ما التصرف؟",
+      choices: [
+        { id: "a", label: "أعتبر جميع Master Mix ملوّثاً وأتخلص منه، وأعقّم الغرفة", safe: true, reason: "منتجات PCR ملايين النسخ — تلوث حتمي" },
+        { id: "b", label: "أستمر بشرط أن أستخدم قفازات جديدة", safe: false, reason: "القفازات لا تكفي — الأمبليكونات محمولة جواً" },
+        { id: "c", label: "أفتح النافذة للتهوية فقط", safe: false, reason: "التهوية لا تُزيل التلوث بالأمبليكونات" },
+      ],
+    },
+  ];
+
+  const [idx, setIdx] = useState(0);
+  const [answered, setAnswered] = useState<{ safe: boolean; reason: string } | null>(null);
+
+  const current = scenarios[idx];
+
+  const pick = (c: ContamChoice) => {
+    if (answered) return;
+    setAnswered({ safe: c.safe, reason: c.reason });
+    if (c.safe) {
+      onLog(`✓ استجابة صحيحة للسيناريو ${idx + 1}: ${c.reason}`);
+    } else {
+      onLog(`✗ خطأ في السيناريو ${idx + 1}: ${c.reason}`, false);
+      onContaminated(c.reason);
+    }
+  };
+
+  const next = () => {
+    setAnswered(null);
+    if (idx + 1 < scenarios.length) setIdx(idx + 1);
+    else onDone();
+  };
+
+  return (
+    <div>
+      <h2 className="text-xl font-bold">☣ اختبار التلوث المتقاطع (Cross-Contamination)</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        اختبر استجابتك السريعة لحوادث التلوث المحتملة. أي قرار خاطئ سيُشغّل تنبيه <b className="text-destructive">Contaminated</b> تلقائياً في التقرير النهائي.
+      </p>
+
+      <div className="mt-4 flex items-center gap-2 text-xs">
+        {scenarios.map((_, i) => (
+          <span
+            key={i}
+            className={`h-1.5 flex-1 rounded-full ${i < idx ? "bg-success" : i === idx ? "bg-primary" : "bg-border"}`}
+          />
+        ))}
+        <span className="text-muted-foreground">{idx + 1}/{scenarios.length}</span>
+      </div>
+
+      <div className="mt-5 rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
+        <div className="text-[10px] tracking-widest text-destructive">سيناريو {idx + 1}</div>
+        <div className="mt-1 text-base font-bold">{current.q}</div>
+
+        <div className="mt-4 grid gap-2">
+          {current.choices.map((c) => {
+            const isPicked = answered && answered.reason === c.reason;
+            const revealed = !!answered;
+            const style = revealed
+              ? c.safe
+                ? "border-success/60 bg-success/10 text-success"
+                : isPicked
+                ? "border-destructive/60 bg-destructive/15 text-destructive"
+                : "border-border bg-background/30 text-muted-foreground"
+              : "border-border bg-background/40 hover:border-primary/50 hover:bg-primary/5";
+            return (
+              <button
+                key={c.id}
+                onClick={() => pick(c)}
+                disabled={revealed}
+                className={`rounded-xl border p-3 text-right text-sm transition-colors ${style}`}
+              >
+                <span className="ml-2 font-bold">({c.id})</span>
+                {c.label}
+                {revealed && (
+                  <div className="mt-1 text-xs opacity-80">
+                    {c.safe ? "✓ إجراء آمن — " : "✗ إجراء غير آمن — "}
+                    {c.reason}
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {answered && (
+        <div className="mt-4 flex justify-end">
+          <button
+            onClick={next}
+            className="rounded-xl bg-gradient-to-l from-primary to-accent px-5 py-2 text-sm font-black text-primary-foreground shadow-[var(--shadow-glow)]"
+          >
+            {idx + 1 < scenarios.length ? "التالي ←" : "إنهاء الاختبار ←"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
