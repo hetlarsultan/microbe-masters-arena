@@ -10,16 +10,19 @@ import type { PathogenVisual } from "@/lib/pathogenVisuals";
    ============================================================ */
 
 type Stage =
+  | "calibration"
   | "intro"
   | "biosafety"
   | "verify"
   | "extract"
   | "quant"
   | "mastermix"
+  | "contam"
   | "program"
   | "run"
   | "analyze"
   | "report";
+
 
 interface Patient {
   id: string;
