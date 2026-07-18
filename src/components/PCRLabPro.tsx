@@ -142,12 +142,14 @@ interface AnalysisResult {
 
 
 export function PCRLabPro({ onBack }: { onBack: () => void }) {
-  const [stage, setStage] = useState<Stage>("intro");
+  const [stage, setStage] = useState<Stage>("calibration");
   const [patient, setPatient] = useState<Patient>(PATIENTS[0]);
   const [errors, setErrors] = useState<string[]>([]);
   const [score, setScore] = useState(100);
   const [log, setLog] = useState<{ t: number; msg: string; ok: boolean }[]>([]);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [forcedContam, setForcedContam] = useState(false);
+  const [calibrationOk, setCalibrationOk] = useState(false);
 
   const addLog = (msg: string, ok = true) =>
     setLog((l) => [...l, { t: Date.now(), msg, ok }]);
@@ -158,12 +160,15 @@ export function PCRLabPro({ onBack }: { onBack: () => void }) {
   };
 
   const reset = () => {
-    setStage("intro");
+    setStage("calibration");
     setErrors([]);
     setScore(100);
     setLog([]);
     setAnalysis(null);
+    setForcedContam(false);
+    setCalibrationOk(false);
   };
+
 
   return (
     <div dir="rtl" className="min-h-screen px-4 py-6 md:px-8">
