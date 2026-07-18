@@ -191,11 +191,26 @@ export function PCRLabPro({ onBack }: { onBack: () => void }) {
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
           <main className="rounded-3xl border border-border bg-card p-5 md:p-7">
+            {stage === "calibration" && (
+              <CalibrationStage
+                onLog={(m, ok) => addLog(m, ok)}
+                onWarn={(m) => penalize(m, 5)}
+                onDone={() => {
+                  setCalibrationOk(true);
+                  addLog("✅ الجهاز مُعاير وصالح للاستخدام");
+                  setStage("intro");
+                }}
+              />
+            )}
             {stage === "intro" && (
               <IntroStage
                 patient={patient}
                 setPatient={setPatient}
                 onStart={() => {
+                  if (!calibrationOk) {
+                    penalize("محاولة بدء البروتوكول قبل اكتمال المعايرة", 15);
+                    return;
+                  }
                   addLog(`تم استلام العينة ${patient.id}`);
                   setStage("biosafety");
                 }}
@@ -241,6 +256,16 @@ export function PCRLabPro({ onBack }: { onBack: () => void }) {
               <MasterMixStage
                 onError={(m) => penalize(m, 8)}
                 onLog={(m) => addLog(m)}
+                onDone={() => setStage("contam")}
+              />
+            )}
+            {stage === "contam" && (
+              <ContaminationStage
+                onLog={(m, ok) => addLog(m, ok)}
+                onContaminated={(reason) => {
+                  setForcedContam(true);
+                  penalize(`تلوث متقاطع: ${reason}`, 20);
+                }}
                 onDone={() => setStage("program")}
               />
             )}
@@ -261,6 +286,7 @@ export function PCRLabPro({ onBack }: { onBack: () => void }) {
               <AnalyzeStage
                 patient={patient}
                 errorsCount={errors.length}
+                forcedContam={forcedContam}
                 onWarn={(m) => penalize(m, 5)}
                 onDone={(a) => {
                   setAnalysis(a);
@@ -269,6 +295,7 @@ export function PCRLabPro({ onBack }: { onBack: () => void }) {
                 }}
               />
             )}
+
             {stage === "report" && (
               <ReportStage
                 patient={patient}
