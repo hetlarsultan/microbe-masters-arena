@@ -998,10 +998,11 @@ function RunStage({ onDone, onLog }: { onDone: () => void; onLog: (m: string) =>
    STAGE 9 — REAL-TIME ANALYZE (curves)
 ============================================================ */
 function AnalyzeStage({
-  patient, errorsCount, onDone, onWarn,
+  patient, errorsCount, forcedContam = false, onDone, onWarn,
 }: {
   patient: Patient;
   errorsCount: number;
+  forcedContam?: boolean;
   onDone: (a: AnalysisResult) => void;
   onWarn: (m: string) => void;
 }) {
@@ -1009,8 +1010,10 @@ function AnalyzeStage({
   const [threshold, setThreshold] = useState(0.15);
   const [baselineStart, setBaselineStart] = useState(3);
   const [baselineEnd, setBaselineEnd] = useState(15);
-  const [contaminate, setContaminate] = useState(false);
+  const [contaminate, setContaminate] = useState(forcedContam);
   const warnedRef = useRef<Set<string>>(new Set());
+  useEffect(() => { if (forcedContam) setContaminate(true); }, [forcedContam]);
+
 
   const points = useMemo(() => {
     if (trueCt === null) return Array.from({ length: 40 }, (_, i) => ({ x: i + 1, y: 0.02 + Math.random() * 0.01 }));
