@@ -319,17 +319,20 @@ function Header({ stage }: { stage: Stage }) {
 }
 
 const STAGE_LABEL: Record<Stage, string> = {
+  calibration: "معايرة الجهاز",
   intro: "استقبال العينة",
   biosafety: "السلامة الحيوية",
   verify: "التحقق من العينة",
   extract: "الاستخلاص",
   quant: "قياس التركيز",
   mastermix: "تحضير Master Mix",
+  contam: "اختبار التلوث المتقاطع",
   program: "برمجة الجهاز",
   run: "تشغيل PCR",
   analyze: "تحليل Real-Time",
   report: "التقرير النهائي",
 };
+
 
 /* ============================================================
    STAGE MAP (sidebar)
