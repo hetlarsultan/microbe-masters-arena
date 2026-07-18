@@ -370,7 +370,7 @@ const STAGE_LABEL: Record<Stage, string> = {
    STAGE MAP (sidebar)
 ============================================================ */
 function StageMap({ stage }: { stage: Stage }) {
-  const order: Stage[] = ["intro", "biosafety", "verify", "extract", "quant", "mastermix", "program", "run", "analyze", "report"];
+  const order: Stage[] = ["calibration", "intro", "biosafety", "verify", "extract", "quant", "mastermix", "contam", "program", "run", "analyze", "report"];
   const currentIdx = order.indexOf(stage);
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
