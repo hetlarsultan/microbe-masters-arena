@@ -192,6 +192,19 @@ export function PCRLabPro({ onBack }: { onBack: () => void }) {
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
           <main className="rounded-3xl border border-border bg-card p-5 md:p-7">
+            {stage === "checklist" && (
+              <ChecklistStage
+                onLog={(m, ok) => addLog(m, ok)}
+                onRisk={(reason) => {
+                  setForcedContam(true);
+                  penalize(`إخلال بقائمة منع التلوث: ${reason}`, 15);
+                }}
+                onDone={() => {
+                  addLog("✅ اكتملت قائمة منع التلوث المتقاطع");
+                  setStage("calibration");
+                }}
+              />
+            )}
             {stage === "calibration" && (
               <CalibrationStage
                 onLog={(m, ok) => addLog(m, ok)}
