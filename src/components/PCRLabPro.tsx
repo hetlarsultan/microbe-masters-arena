@@ -143,7 +143,7 @@ interface AnalysisResult {
 
 
 export function PCRLabPro({ onBack }: { onBack: () => void }) {
-  const [stage, setStage] = useState<Stage>("calibration");
+  const [stage, setStage] = useState<Stage>("checklist");
   const [patient, setPatient] = useState<Patient>(PATIENTS[0]);
   const [errors, setErrors] = useState<string[]>([]);
   const [score, setScore] = useState(100);
