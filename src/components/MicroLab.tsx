@@ -2,8 +2,9 @@ import { useMemo, useState } from "react";
 import { BRANCHES, CASES, type Branch, type Case, type Test } from "@/lib/cases";
 import { EQUIPMENT, type Equipment } from "@/lib/equipment";
 import { InstrumentLab } from "./InstrumentLab";
+import { CameraDiagnose } from "./CameraDiagnose";
 
-type Stage = "menu" | "case" | "result" | "learn" | "instruments";
+type Stage = "menu" | "case" | "result" | "learn" | "instruments" | "camera";
 
 export function MicroLab() {
   const [stage, setStage] = useState<Stage>("menu");
@@ -70,6 +71,7 @@ export function MicroLab() {
         onStart={startBranch}
         onLearn={openLearn}
         onInstruments={() => setStage("instruments")}
+        onCamera={() => setStage("camera")}
         score={score}
         solvedCount={solved.length}
         total={CASES.length}
@@ -79,6 +81,10 @@ export function MicroLab() {
 
   if (stage === "instruments") {
     return <InstrumentLab onBack={() => setStage("menu")} />;
+  }
+
+  if (stage === "camera") {
+    return <CameraDiagnose onBack={() => setStage("menu")} />;
   }
 
   if (stage === "learn") {
@@ -138,11 +144,12 @@ function FloatingMicrobes() {
 }
 
 function Menu({
-  onStart, onLearn, onInstruments, score, solvedCount, total,
+  onStart, onLearn, onInstruments, onCamera, score, solvedCount, total,
 }: {
   onStart: (b: Branch | "all") => void;
   onLearn: (b: Branch | "general") => void;
   onInstruments: () => void;
+  onCamera: () => void;
   score: number;
   solvedCount: number;
   total: number;
@@ -191,6 +198,30 @@ function Menu({
                 </p>
               </div>
               <span className="hidden text-3xl text-toxic transition-transform group-hover:translate-x-2 md:block">←</span>
+            </div>
+          </button>
+        </section>
+
+        <section className="mt-6">
+          <button
+            onClick={onCamera}
+            className="group relative w-full overflow-hidden rounded-3xl border border-primary/40 bg-card p-6 text-right transition-all hover:-translate-y-1 hover:border-primary"
+          >
+            <div className="absolute -left-10 -top-10 size-40 rounded-full bg-primary/20 blur-3xl" />
+            <div className="absolute -right-10 -bottom-10 size-40 rounded-full bg-toxic/20 blur-3xl" />
+            <div className="relative flex items-center gap-5">
+              <div className="grid size-20 place-items-center rounded-2xl bg-primary/15 text-5xl">
+                📷
+              </div>
+              <div className="flex-1">
+                <div className="text-xs font-bold tracking-widest text-primary">AI VISION · جديد</div>
+                <h3 className="mt-1 text-2xl font-black md:text-3xl">التعرف على العينات بالكاميرا</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  صوّر الصبغة أو المستعمرات أو اللوحة، ويقوم المساعد الذكي بتحليل
+                  المشاهدات واقتراح المسبب المرضي والتشخيص المبدئي.
+                </p>
+              </div>
+              <span className="hidden text-3xl text-primary transition-transform group-hover:translate-x-2 md:block">←</span>
             </div>
           </button>
         </section>
