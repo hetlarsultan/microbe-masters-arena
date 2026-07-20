@@ -352,6 +352,7 @@ function Header({ stage }: { stage: Stage }) {
 }
 
 const STAGE_LABEL: Record<Stage, string> = {
+  checklist: "قائمة منع التلوث",
   calibration: "معايرة الجهاز",
   intro: "استقبال العينة",
   biosafety: "السلامة الحيوية",
