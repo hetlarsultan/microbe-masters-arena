@@ -10,6 +10,7 @@ import type { PathogenVisual } from "@/lib/pathogenVisuals";
    ============================================================ */
 
 type Stage =
+  | "checklist"
   | "calibration"
   | "intro"
   | "biosafety"
