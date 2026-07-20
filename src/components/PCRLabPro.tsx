@@ -10,6 +10,7 @@ import type { PathogenVisual } from "@/lib/pathogenVisuals";
    ============================================================ */
 
 type Stage =
+  | "checklist"
   | "calibration"
   | "intro"
   | "biosafety"
@@ -142,7 +143,7 @@ interface AnalysisResult {
 
 
 export function PCRLabPro({ onBack }: { onBack: () => void }) {
-  const [stage, setStage] = useState<Stage>("calibration");
+  const [stage, setStage] = useState<Stage>("checklist");
   const [patient, setPatient] = useState<Patient>(PATIENTS[0]);
   const [errors, setErrors] = useState<string[]>([]);
   const [score, setScore] = useState(100);
@@ -160,7 +161,7 @@ export function PCRLabPro({ onBack }: { onBack: () => void }) {
   };
 
   const reset = () => {
-    setStage("calibration");
+    setStage("checklist");
     setErrors([]);
     setScore(100);
     setLog([]);
@@ -191,6 +192,19 @@ export function PCRLabPro({ onBack }: { onBack: () => void }) {
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
           <main className="rounded-3xl border border-border bg-card p-5 md:p-7">
+            {stage === "checklist" && (
+              <ChecklistStage
+                onLog={(m, ok) => addLog(m, ok)}
+                onRisk={(reason) => {
+                  setForcedContam(true);
+                  penalize(`إخلال بقائمة منع التلوث: ${reason}`, 15);
+                }}
+                onDone={() => {
+                  addLog("✅ اكتملت قائمة منع التلوث المتقاطع");
+                  setStage("calibration");
+                }}
+              />
+            )}
             {stage === "calibration" && (
               <CalibrationStage
                 onLog={(m, ok) => addLog(m, ok)}
@@ -351,6 +365,7 @@ function Header({ stage }: { stage: Stage }) {
 }
 
 const STAGE_LABEL: Record<Stage, string> = {
+  checklist: "قائمة منع التلوث",
   calibration: "معايرة الجهاز",
   intro: "استقبال العينة",
   biosafety: "السلامة الحيوية",
@@ -370,7 +385,7 @@ const STAGE_LABEL: Record<Stage, string> = {
    STAGE MAP (sidebar)
 ============================================================ */
 function StageMap({ stage }: { stage: Stage }) {
-  const order: Stage[] = ["calibration", "intro", "biosafety", "verify", "extract", "quant", "mastermix", "contam", "program", "run", "analyze", "report"];
+  const order: Stage[] = ["checklist", "calibration", "intro", "biosafety", "verify", "extract", "quant", "mastermix", "contam", "program", "run", "analyze", "report"];
   const currentIdx = order.indexOf(stage);
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
@@ -404,6 +419,7 @@ function StageMap({ stage }: { stage: Stage }) {
    PROFESSOR PANEL (Arabic TTS)
 ============================================================ */
 const PROFESSOR: Record<Stage, string> = {
+  checklist: "قبل بدء وضع Pro Mode، راجع قائمة تدقيق منع التلوث المتقاطع بعناية. أي بند حرج غير مُنفَّذ سيؤدي إلى ظهور نتيجة Contaminated تلقائياً في التقرير النهائي.",
   calibration: "قبل أي بروتوكول، عايِر جهاز Real-Time PCR: كفاءة التفاعل يجب أن تكون بين 90٪ و110٪، ومعامل R² لا يقل عن 0.98، والميل بين -3.6 و-3.1.",
   intro: "أهلاً بك أيها الزميل. اختر ملف المريض من قائمة الاستقبال ثم ابدأ بارتداء معدات الحماية.",
   biosafety: "ارتدِ القفازات والمعطف وقناع N95 والنظارات، وعقّم السطح بالكحول 70٪. لا تُدخل الهاتف أو الطعام إلى المنطقة.",
@@ -1635,6 +1651,154 @@ function ContaminationStage({
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ============================================================
+   CHECKLIST STAGE — قائمة تدقيق منع التلوث المتقاطع
+   مرتبطة مباشرة بنتيجة Contaminated في التقرير النهائي
+============================================================ */
+interface ChecklistItem {
+  id: string;
+  label: string;
+  detail: string;
+  critical: boolean; // ترك بند حرج بدون تنفيذ = تلوث متقاطع مؤكد
+}
+
+const CHECKLIST_ITEMS: ChecklistItem[] = [
+  { id: "rooms", label: "فصل الغرف الثلاث (Pre-PCR / Extraction / Post-PCR)", detail: "منع انتقال الأمبليكونات إلى منطقة تحضير الخليط.", critical: true },
+  { id: "flow", label: "تدفق أحادي الاتجاه بين الغرف (Uni-directional workflow)", detail: "الدخول من النظيف إلى الملوَّث، لا العكس أبداً.", critical: true },
+  { id: "coats", label: "معطف مخصص لكل غرفة", detail: "ألوان مختلفة لتفادي نقل الحمض النووي بين المناطق.", critical: true },
+  { id: "tips", label: "استخدام Filter Tips (aerosol barrier)", detail: "منع تلوث الماصات بالرذاذ المحمّل بالأحماض النووية.", critical: true },
+  { id: "ntc", label: "تضمين No-Template Control (NTC) في كل رَن", detail: "الكاشف الذهبي لكشف التلوث في Master Mix.", critical: true },
+  { id: "uv", label: "تشعيع UV لكابينة PCR قبل التحضير", detail: "لتفكيك أي DNA/RNA متبقٍ على الأسطح.", critical: true },
+  { id: "bleach", label: "مسح الأسطح بمحلول Bleach 10٪ ثم Ethanol 70٪", detail: "لإزالة الأحماض النووية من مناطق العمل.", critical: false },
+  { id: "aliquot", label: "تقسيم الكواشف إلى Aliquots صغيرة", detail: "للحد من دورات التجميد/الإذابة ومنع التلوث الجماعي.", critical: false },
+  { id: "gloves", label: "تغيير القفازات عند الانتقال بين الغرف", detail: "أهم إجراء يومي لمنع التلوث المتقاطع.", critical: true },
+  { id: "vortex", label: "دوران خفيف وطرد مركزي قصير قبل فتح الأنابيب", detail: "لتفادي رذاذ الفتح المفاجئ.", critical: false },
+];
+
+function ChecklistStage({
+  onLog,
+  onRisk,
+  onDone,
+}: {
+  onLog: (m: string, ok?: boolean) => void;
+  onRisk: (reason: string) => void;
+  onDone: () => void;
+}) {
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [submitted, setSubmitted] = useState(false);
+
+  const totalCritical = CHECKLIST_ITEMS.filter((i) => i.critical).length;
+  const doneCritical = CHECKLIST_ITEMS.filter((i) => i.critical && checked[i.id]).length;
+  const totalAll = CHECKLIST_ITEMS.length;
+  const doneAll = CHECKLIST_ITEMS.filter((i) => checked[i.id]).length;
+  const pct = Math.round((doneAll / totalAll) * 100);
+
+  const toggle = (id: string) => setChecked((c) => ({ ...c, [id]: !c[id] }));
+
+  const submit = () => {
+    setSubmitted(true);
+    const missedCritical = CHECKLIST_ITEMS.filter((i) => i.critical && !checked[i.id]);
+    if (missedCritical.length > 0) {
+      missedCritical.forEach((i) => {
+        onRisk(i.label);
+        onLog(`⚠ بند حرج غير مُنفَّذ: ${i.label}`, false);
+      });
+      onLog(
+        `☣ تحذير: ${missedCritical.length} من إجراءات منع التلوث الحرجة لم تُنفَّذ — سيُسجَّل التقرير كـ Contaminated`,
+        false,
+      );
+    } else {
+      onLog("🛡 جميع البنود الحرجة مكتملة — بيئة آمنة ضد التلوث المتقاطع");
+    }
+  };
+
+  return (
+    <div>
+      <div className="mb-4 rounded-2xl border border-warning/40 bg-warning/10 p-4">
+        <div className="flex items-center gap-2 text-warning">
+          <span className="text-2xl">🛡</span>
+          <div>
+            <div className="text-sm font-black">شاشة إرشادية — قبل تشغيل Pro Mode</div>
+            <div className="text-xs text-muted-foreground">
+              راجع قائمة تدقيق منع التلوث المتقاطع. أي بند حرج (⭐) غير مُنفَّذ سيربط النتيجة النهائية بحالة{" "}
+              <span className="font-bold text-destructive">☣ Contaminated</span> تلقائياً في تقرير Real-Time PCR.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-4 flex flex-wrap items-center gap-3 text-xs">
+        <span className="rounded-full border border-border bg-background/40 px-3 py-1">
+          الإجمالي: <span className="font-bold text-foreground">{doneAll}/{totalAll}</span>
+        </span>
+        <span className="rounded-full border border-destructive/40 bg-destructive/10 px-3 py-1 text-destructive">
+          البنود الحرجة: <span className="font-black">{doneCritical}/{totalCritical}</span>
+        </span>
+        <div className="ml-auto h-2 min-w-[140px] flex-1 overflow-hidden rounded-full bg-background/40">
+          <div className="h-full bg-gradient-to-l from-primary to-accent transition-all" style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+
+      <div className="grid gap-2 md:grid-cols-2">
+        {CHECKLIST_ITEMS.map((item) => {
+          const isChecked = !!checked[item.id];
+          const missedCrit = submitted && item.critical && !isChecked;
+          return (
+            <button
+              key={item.id}
+              onClick={() => toggle(item.id)}
+              className={`rounded-xl border p-3 text-right transition-colors ${
+                missedCrit
+                  ? "border-destructive bg-destructive/15"
+                  : isChecked
+                  ? "border-success/60 bg-success/10"
+                  : "border-border bg-background/30 hover:border-primary/50 hover:bg-primary/5"
+              }`}
+            >
+              <div className="flex items-start gap-2">
+                <span className="mt-0.5 text-lg">
+                  {isChecked ? "☑" : missedCrit ? "☣" : "☐"}
+                </span>
+                <div className="flex-1">
+                  <div className="text-sm font-bold">
+                    {item.critical && <span className="ml-1 text-warning">⭐</span>}
+                    {item.label}
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">{item.detail}</div>
+                  {missedCrit && (
+                    <div className="mt-1 text-xs font-bold text-destructive">
+                      ← بند حرج غير مُنفَّذ — سيُفعِّل ☣ Contaminated
+                    </div>
+                  )}
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-5 flex flex-wrap items-center justify-end gap-3">
+        {!submitted ? (
+          <button
+            onClick={submit}
+            disabled={doneAll === 0}
+            className="rounded-xl border border-primary/60 bg-primary/10 px-5 py-2 text-sm font-bold text-primary disabled:opacity-40"
+          >
+            تأكيد القائمة
+          </button>
+        ) : (
+          <button
+            onClick={onDone}
+            className="rounded-xl bg-gradient-to-l from-primary to-accent px-6 py-2 text-sm font-black text-primary-foreground shadow-[var(--shadow-glow)]"
+          >
+            بدء Pro Mode ←
+          </button>
+        )}
+      </div>
     </div>
   );
 }
