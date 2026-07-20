@@ -202,8 +202,6 @@ function Menu({
           </button>
         </section>
 
-        </section>
-
         <section className="mt-6">
           <button
             onClick={onCamera}
