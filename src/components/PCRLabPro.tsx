@@ -161,7 +161,7 @@ export function PCRLabPro({ onBack }: { onBack: () => void }) {
   };
 
   const reset = () => {
-    setStage("calibration");
+    setStage("checklist");
     setErrors([]);
     setScore(100);
     setLog([]);
