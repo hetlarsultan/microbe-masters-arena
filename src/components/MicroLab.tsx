@@ -74,6 +74,7 @@ export function MicroLab() {
         onLearn={openLearn}
         onInstruments={() => setStage("instruments")}
         onCamera={() => setStage("camera")}
+        onTests={() => setStage("tests")}
         score={score}
         solvedCount={solved.length}
         total={CASES.length}
@@ -88,6 +89,11 @@ export function MicroLab() {
   if (stage === "camera") {
     return <CameraDiagnose onBack={() => setStage("menu")} />;
   }
+
+  if (stage === "tests") {
+    return <LabTestsLibrary onBack={() => setStage("menu")} />;
+  }
+
 
   if (stage === "learn") {
     return <LearnView branch={learnBranch} onBack={() => setStage("menu")} onChange={setLearnBranch} />;
