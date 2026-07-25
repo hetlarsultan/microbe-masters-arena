@@ -3,8 +3,10 @@ import { BRANCHES, CASES, type Branch, type Case, type Test } from "@/lib/cases"
 import { EQUIPMENT, type Equipment } from "@/lib/equipment";
 import { InstrumentLab } from "./InstrumentLab";
 import { CameraDiagnose } from "./CameraDiagnose";
+import { LabTestsLibrary } from "./LabTestsLibrary";
 
-type Stage = "menu" | "case" | "result" | "learn" | "instruments" | "camera";
+type Stage = "menu" | "case" | "result" | "learn" | "instruments" | "camera" | "tests";
+
 
 export function MicroLab() {
   const [stage, setStage] = useState<Stage>("menu");
