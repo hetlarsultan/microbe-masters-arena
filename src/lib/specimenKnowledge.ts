@@ -4,7 +4,7 @@ import type { SpecimenAnalysis } from "./api/analyze-specimen.functions";
 // كل مدخل يمثل نمط عينة شائع مع مسبباته وفحوصه التأكيدية.
 export type SpecimenTemplate = {
   keywords: string[];
-  data: Omit<SpecimenAnalysis, "confidence" | "raw"> & { confidence?: number };
+  data: Omit<SpecimenAnalysis, "confidence" | "raw" | "notes"> & { notes?: string };
 };
 
 export const SPECIMEN_LIBRARY: SpecimenTemplate[] = [
