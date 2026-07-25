@@ -152,16 +152,18 @@ function FloatingMicrobes() {
 }
 
 function Menu({
-  onStart, onLearn, onInstruments, onCamera, score, solvedCount, total,
+  onStart, onLearn, onInstruments, onCamera, onTests, score, solvedCount, total,
 }: {
   onStart: (b: Branch | "all") => void;
   onLearn: (b: Branch | "general") => void;
   onInstruments: () => void;
   onCamera: () => void;
+  onTests: () => void;
   score: number;
   solvedCount: number;
   total: number;
 }) {
+
   return (
     <div className="relative min-h-screen overflow-hidden px-6 py-12">
       <FloatingMicrobes />
