@@ -4,8 +4,17 @@ import {
   type SpecimenAnalysis,
 } from "@/lib/api/analyze-specimen.functions";
 import { offlineAnalyze, toPCRIndicator, type PCRIndicator } from "@/lib/specimenKnowledge";
+import {
+  addRecord,
+  clearHistory,
+  deleteRecord,
+  loadHistory,
+  makeThumbnail,
+  statusOf,
+  type DiagnosisRecord,
+} from "@/lib/diagnosisHistory";
 
-type Status = "idle" | "camera" | "captured" | "analyzing" | "done" | "error";
+type Status = "idle" | "camera" | "captured" | "analyzing" | "done" | "error" | "history";
 
 export function CameraDiagnose({ onBack }: { onBack: () => void }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -19,8 +28,11 @@ export function CameraDiagnose({ onBack }: { onBack: () => void }) {
   const [result, setResult] = useState<SpecimenAnalysis | null>(null);
   const [source, setSource] = useState<"ai" | "offline">("ai");
   const [facing, setFacing] = useState<"environment" | "user">("environment");
+  const [history, setHistory] = useState<DiagnosisRecord[]>([]);
+  const [viewingRecord, setViewingRecord] = useState<DiagnosisRecord | null>(null);
 
   useEffect(() => {
+    setHistory(loadHistory());
     return () => stopCamera();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -85,16 +97,23 @@ export function CameraDiagnose({ onBack }: { onBack: () => void }) {
     reader.readAsDataURL(file);
   }
 
+  async function persistResult(r: SpecimenAnalysis, src: "ai" | "offline") {
+    const thumb = imageDataUrl ? await makeThumbnail(imageDataUrl) : null;
+    addRecord({ source: src, thumbnail: thumb, hint: hint || undefined, result: r });
+    setHistory(loadHistory());
+  }
+
   async function analyze() {
     if (!imageDataUrl) return;
     setStatus("analyzing");
     setError("");
 
-    // إذا كان الجهاز غير متصل، استخدم القاعدة المحلية مباشرة
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      setResult(offlineAnalyze(hint));
+      const r = offlineAnalyze(hint);
+      setResult(r);
       setSource("offline");
       setStatus("done");
+      await persistResult(r, "offline");
       return;
     }
 
@@ -103,12 +122,22 @@ export function CameraDiagnose({ onBack }: { onBack: () => void }) {
       setResult(r);
       setSource("ai");
       setStatus("done");
+      await persistResult(r, "ai");
     } catch {
-      // فشل الاتصال بالخادم — تحويل تلقائي للوضع دون إنترنت
-      setResult(offlineAnalyze(hint));
+      const r = offlineAnalyze(hint);
+      setResult(r);
       setSource("offline");
       setStatus("done");
+      await persistResult(r, "offline");
     }
+  }
+
+  async function runOfflineNow() {
+    const r = offlineAnalyze(hint);
+    setResult(r);
+    setSource("offline");
+    setStatus("done");
+    await persistResult(r, "offline");
   }
 
   function reset() {
@@ -117,6 +146,26 @@ export function CameraDiagnose({ onBack }: { onBack: () => void }) {
     setHint("");
     setError("");
     setStatus("idle");
+  }
+
+  function openHistoryRecord(r: DiagnosisRecord) {
+    setViewingRecord(r);
+  }
+
+  function closeRecordView() {
+    setViewingRecord(null);
+  }
+
+  function removeRecord(id: string) {
+    deleteRecord(id);
+    setHistory(loadHistory());
+  }
+
+  function wipeHistory() {
+    if (confirm("سيتم حذف كل السجل. متابعة؟")) {
+      clearHistory();
+      setHistory([]);
+    }
   }
 
   return (
@@ -135,11 +184,28 @@ export function CameraDiagnose({ onBack }: { onBack: () => void }) {
           </div>
         </div>
 
-        <p className="mb-6 rounded-xl border border-border bg-card/60 p-3 text-sm text-muted-foreground">
-          صوّر العينة (صبغة جرام، مستعمرات، مسحة دموية، لوحة ELISA، جل رحلان،
-          فحص بول/براز، شريط اختبار، منحنى PCR…) وسيتولّى المساعد الميكروبيولوجي
-          الذكي تحليلها. يعمل التطبيق أيضاً دون إنترنت باستخدام قاعدة معرفة داخلية.
-        </p>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <p className="flex-1 rounded-xl border border-border bg-card/60 p-3 text-sm text-muted-foreground">
+            صوّر العينة (صبغة جرام، مستعمرات، مسحة دموية، ELISA، جل رحلان، منحنى PCR…) وسيحلّلها المساعد الذكي.
+            يعمل التطبيق دون إنترنت باستخدام قاعدة معرفة داخلية.
+          </p>
+          <button
+            onClick={() => setStatus(status === "history" ? "idle" : "history")}
+            className="rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 text-sm font-bold text-primary hover:bg-primary/20"
+          >
+            🗂 سجل التشخيصات ({history.length})
+          </button>
+        </div>
+
+        {status === "history" && (
+          <HistoryPanel
+            history={history}
+            onOpen={openHistoryRecord}
+            onDelete={removeRecord}
+            onClear={wipeHistory}
+            onClose={() => setStatus("idle")}
+          />
+        )}
 
         {status === "idle" && (
           <div className="grid gap-4 md:grid-cols-2">
@@ -214,7 +280,7 @@ export function CameraDiagnose({ onBack }: { onBack: () => void }) {
                 {status === "analyzing" ? "⏳ جاري التحليل…" : "🧠 تحليل العينة"}
               </button>
               <button
-                onClick={() => { setResult(offlineAnalyze(hint)); setSource("offline"); setStatus("done"); }}
+                onClick={runOfflineNow}
                 className="rounded-xl border border-border bg-card px-4 py-2 text-sm hover:bg-accent"
               >
                 📴 تحليل دون إنترنت
@@ -249,6 +315,142 @@ export function CameraDiagnose({ onBack }: { onBack: () => void }) {
 
         <canvas ref={canvasRef} className="hidden" />
       </div>
+
+      {viewingRecord && (
+        <RecordModal record={viewingRecord} onClose={closeRecordView} />
+      )}
+    </div>
+  );
+}
+
+/* ==================== History Panel ==================== */
+
+function HistoryPanel({
+  history,
+  onOpen,
+  onDelete,
+  onClear,
+  onClose,
+}: {
+  history: DiagnosisRecord[];
+  onOpen: (r: DiagnosisRecord) => void;
+  onDelete: (id: string) => void;
+  onClear: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="mb-6 rounded-2xl border border-primary/30 bg-card p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="text-sm font-bold tracking-widest text-primary">🗂 سجل التشخيصات</div>
+        <div className="flex gap-2">
+          {history.length > 0 && (
+            <button
+              onClick={onClear}
+              className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-1 text-xs font-semibold text-destructive hover:bg-destructive/20"
+            >
+              مسح الكل
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-border bg-background px-3 py-1 text-xs hover:bg-accent"
+          >
+            إغلاق
+          </button>
+        </div>
+      </div>
+
+      {history.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+          لا يوجد سجل بعد. حلّل عينة لتظهر هنا تلقائياً.
+        </div>
+      ) : (
+        <ul className="grid gap-2 md:grid-cols-2">
+          {history.map((r) => {
+            const st = statusOf(r);
+            const date = new Date(r.date).toLocaleString("ar-EG");
+            return (
+              <li
+                key={r.id}
+                className="flex items-center gap-3 rounded-xl border border-border bg-background/50 p-2"
+              >
+                <button
+                  onClick={() => onOpen(r)}
+                  className="flex flex-1 items-center gap-3 text-right"
+                >
+                  <div className="size-16 shrink-0 overflow-hidden rounded-lg bg-black">
+                    {r.thumbnail ? (
+                      <img src={r.thumbnail} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="grid h-full w-full place-items-center text-2xl">🧪</div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="truncate text-sm font-bold">{r.result.specimen}</div>
+                      <span
+                        className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold"
+                        style={{ background: `${st.color}22`, color: st.color }}
+                      >
+                        {st.label}
+                      </span>
+                    </div>
+                    <div className="truncate text-xs text-muted-foreground">{r.result.diagnosis}</div>
+                    <div className="mt-0.5 flex items-center gap-2 text-[10px] text-muted-foreground">
+                      <span>{date}</span>
+                      <span>•</span>
+                      <span>{r.source === "ai" ? "AI" : "OFFLINE"}</span>
+                      <span>•</span>
+                      <span>ثقة {r.result.confidence}%</span>
+                    </div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => onDelete(r.id)}
+                  className="rounded-lg border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  title="حذف"
+                >
+                  ✕
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function RecordModal({ record, onClose }: { record: DiagnosisRecord; onClose: () => void }) {
+  return (
+    <div
+      dir="rtl"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl border border-border bg-background p-4 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3 flex items-center justify-between">
+          <div className="text-xs text-muted-foreground">
+            تقرير محفوظ · {new Date(record.date).toLocaleString("ar-EG")}
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-border bg-card px-3 py-1 text-sm hover:bg-accent"
+          >
+            ✕ إغلاق
+          </button>
+        </div>
+        <ReportPage
+          result={record.result}
+          image={record.thumbnail}
+          source={record.source}
+          onReset={onClose}
+          resetLabel="إغلاق التقرير"
+        />
+      </div>
     </div>
   );
 }
@@ -260,11 +462,13 @@ function ReportPage({
   image,
   source,
   onReset,
+  resetLabel = "تحليل عينة أخرى",
 }: {
   result: SpecimenAnalysis;
   image: string | null;
   source: "ai" | "offline";
   onReset: () => void;
+  resetLabel?: string;
 }) {
   const conf = Math.max(0, Math.min(100, result.confidence));
   const pcr = toPCRIndicator(result);
@@ -384,7 +588,7 @@ function ReportPage({
           onClick={onReset}
           className="rounded-xl bg-toxic px-6 py-2 font-bold text-background hover:opacity-90"
         >
-          تحليل عينة أخرى
+          {resetLabel}
         </button>
       </div>
     </div>
@@ -394,14 +598,12 @@ function ReportPage({
 /* ---------- PCR Indicator Panel ---------- */
 
 function PCRIndicatorPanel({ pcr }: { pcr: PCRIndicator }) {
-  // بناء منحنى سيغمويدي مبسّط بناءً على قيمة Ct
   const width = 320;
   const height = 110;
   const cycles = 40;
   const ct = pcr.ctValue;
   const points: string[] = [];
   for (let c = 1; c <= cycles; c++) {
-    // منحنى لوجستي: يرتفع حول Ct
     const y = 1 / (1 + Math.exp(-(c - ct) * 0.6));
     const px = (c / cycles) * width;
     const py = height - 10 - y * (height - 20);
@@ -430,7 +632,6 @@ function PCRIndicatorPanel({ pcr }: { pcr: PCRIndicator }) {
 
       <div className="overflow-hidden rounded-xl border border-border bg-background/60 p-2">
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full" preserveAspectRatio="none">
-          {/* grid */}
           {[0.25, 0.5, 0.75].map((f) => (
             <line
               key={f}
@@ -442,7 +643,6 @@ function PCRIndicatorPanel({ pcr }: { pcr: PCRIndicator }) {
               strokeOpacity={0.08}
             />
           ))}
-          {/* threshold line */}
           <line
             x1={0}
             x2={width}
@@ -452,14 +652,12 @@ function PCRIndicatorPanel({ pcr }: { pcr: PCRIndicator }) {
             strokeDasharray="4 4"
             strokeWidth={1.2}
           />
-          {/* amplification curve */}
           <polyline
             points={points.join(" ")}
             fill="none"
             stroke={pcr.color}
             strokeWidth={2}
           />
-          {/* Ct marker */}
           <line
             x1={(ct / cycles) * width}
             x2={(ct / cycles) * width}

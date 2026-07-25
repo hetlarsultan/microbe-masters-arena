@@ -3,8 +3,10 @@ import { BRANCHES, CASES, type Branch, type Case, type Test } from "@/lib/cases"
 import { EQUIPMENT, type Equipment } from "@/lib/equipment";
 import { InstrumentLab } from "./InstrumentLab";
 import { CameraDiagnose } from "./CameraDiagnose";
+import { LabTestsLibrary } from "./LabTestsLibrary";
 
-type Stage = "menu" | "case" | "result" | "learn" | "instruments" | "camera";
+type Stage = "menu" | "case" | "result" | "learn" | "instruments" | "camera" | "tests";
+
 
 export function MicroLab() {
   const [stage, setStage] = useState<Stage>("menu");
@@ -72,6 +74,7 @@ export function MicroLab() {
         onLearn={openLearn}
         onInstruments={() => setStage("instruments")}
         onCamera={() => setStage("camera")}
+        onTests={() => setStage("tests")}
         score={score}
         solvedCount={solved.length}
         total={CASES.length}
@@ -86,6 +89,11 @@ export function MicroLab() {
   if (stage === "camera") {
     return <CameraDiagnose onBack={() => setStage("menu")} />;
   }
+
+  if (stage === "tests") {
+    return <LabTestsLibrary onBack={() => setStage("menu")} />;
+  }
+
 
   if (stage === "learn") {
     return <LearnView branch={learnBranch} onBack={() => setStage("menu")} onChange={setLearnBranch} />;
@@ -144,16 +152,18 @@ function FloatingMicrobes() {
 }
 
 function Menu({
-  onStart, onLearn, onInstruments, onCamera, score, solvedCount, total,
+  onStart, onLearn, onInstruments, onCamera, onTests, score, solvedCount, total,
 }: {
   onStart: (b: Branch | "all") => void;
   onLearn: (b: Branch | "general") => void;
   onInstruments: () => void;
   onCamera: () => void;
+  onTests: () => void;
   score: number;
   solvedCount: number;
   total: number;
 }) {
+
   return (
     <div className="relative min-h-screen overflow-hidden px-6 py-12">
       <FloatingMicrobes />
@@ -226,7 +236,28 @@ function Menu({
           </button>
         </section>
 
+        <section className="mt-6">
+          <button
+            onClick={onTests}
+            className="group relative w-full overflow-hidden rounded-3xl border border-accent/40 bg-card p-6 text-right transition-all hover:-translate-y-1 hover:border-accent"
+          >
+            <div className="absolute -left-10 -top-10 size-40 rounded-full bg-accent/20 blur-3xl" />
+            <div className="relative flex items-center gap-5">
+              <div className="grid size-20 place-items-center rounded-2xl bg-accent/15 text-5xl">🧫</div>
+              <div className="flex-1">
+                <div className="text-xs font-bold tracking-widest text-accent">REFERENCE · مرجع مخبري</div>
+                <h3 className="mt-1 text-2xl font-black md:text-3xl">مكتبة التحاليل والأوساط الزراعية</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Blood Agar، MSA، Catalase، Coagulase، Disk Diffusion، VITEK، وPCR mecA لـ MRSA — مع خطوات العمل والتفسير.
+                </p>
+              </div>
+              <span className="hidden text-3xl text-accent transition-transform group-hover:translate-x-2 md:block">←</span>
+            </div>
+          </button>
+        </section>
+
         <section className="mt-12">
+
           <h2 className="mb-4 text-sm font-semibold tracking-widest text-muted-foreground">
             اختر التخصص
           </h2>
